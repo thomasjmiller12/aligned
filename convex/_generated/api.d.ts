@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as crons from "../crons.js";
 import type * as games from "../games.js";
+import type * as ripples from "../ripples.js";
 import type * as spectrums from "../spectrums.js";
 import type * as timers from "../timers.js";
 
@@ -19,7 +21,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  crons: typeof crons;
   games: typeof games;
+  ripples: typeof ripples;
   spectrums: typeof spectrums;
   timers: typeof timers;
 }>;
