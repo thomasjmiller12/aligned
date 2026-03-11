@@ -154,10 +154,20 @@ export default function SpectrumDial({
       const rect = svgRef.current.getBoundingClientRect();
       const scaleX = rect.width / SIZE;
       const scaleY = rect.height / (SIZE - 20);
-      return {
-        x: (clientX - rect.left) / scaleX,
-        y: (clientY - rect.top) / scaleY,
+      let x = (clientX - rect.left) / scaleX;
+      let y = (clientY - rect.top) / scaleY;
+
+      // Soft-constrain: allow up to 50% beyond viewBox, then rubber-band
+      const margin = SIZE * 0.5;
+      const clampWithRubberBand = (val: number, min: number, max: number) => {
+        if (val < min - margin) return min - margin + (val - (min - margin)) * 0.2;
+        if (val > max + margin) return max + margin + (val - (max + margin)) * 0.2;
+        return val;
       };
+      x = clampWithRubberBand(x, 0, SIZE);
+      y = clampWithRubberBand(y, 0, SIZE - 20);
+
+      return { x, y };
     },
     []
   );
@@ -206,11 +216,12 @@ export default function SpectrumDial({
   const bgArcPath = `M ${arcStart.x} ${arcStart.y} A ${RADIUS} ${RADIUS} 0 0 1 ${arcEnd.x} ${arcEnd.y} L ${CENTER_X} ${CENTER_Y} Z`;
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center overflow-visible">
       <svg
         ref={svgRef}
         viewBox={`0 0 ${SIZE} ${SIZE - 20}`}
         className="w-full max-w-[420px] touch-none select-none"
+        style={{ overflow: "visible" }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
