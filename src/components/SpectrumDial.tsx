@@ -270,6 +270,25 @@ export default function SpectrumDial({
           strokeLinecap="round"
         />
 
+        {/* Arc highlight near ghost position during drag */}
+        {isFreeDragging && myPosition !== undefined && (() => {
+          const glowStart = Math.max(0, myPosition - 12);
+          const glowEnd = Math.min(180, myPosition + 12);
+          const gs = posOnArc(glowStart, RADIUS);
+          const ge = posOnArc(glowEnd, RADIUS);
+          const glowPath = `M ${gs.x} ${gs.y} A ${RADIUS} ${RADIUS} 0 0 1 ${ge.x} ${ge.y}`;
+          return (
+            <path
+              d={glowPath}
+              fill="none"
+              stroke="#E8553A"
+              strokeWidth={14}
+              strokeLinecap="round"
+              opacity={0.15}
+            />
+          );
+        })()}
+
         {/* Scoring wedge — radial pie slices from center (reveal) */}
         {showScoringWedge && hasTarget && (
           <motion.g
