@@ -7,6 +7,7 @@ import { getSessionId } from "@/lib/session";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Sparkles, Users } from "lucide-react";
+import FluidBackground from "@/components/FluidBackground";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -57,24 +58,7 @@ export default function LandingPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden p-6">
-      {/* Animated background blobs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <motion.div
-          className="absolute -left-32 -top-32 h-96 w-96 rounded-full bg-primary/5 blur-3xl"
-          animate={{ x: [0, 40, 0], y: [0, 30, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-accent/5 blur-3xl"
-          animate={{ x: [0, -30, 0], y: [0, -40, 0] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute left-1/2 top-1/3 h-64 w-64 -translate-x-1/2 rounded-full bg-secondary/5 blur-3xl"
-          animate={{ scale: [1, 1.2, 1] }}
-          transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
+      <FluidBackground interactive playerColor="#E8553A" />
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
