@@ -125,6 +125,7 @@ export default function SpectrumDial({
   const [isDragging, setIsDragging] = useState(false);
   // Raw pointer position in SVG-space during drag (null when not dragging)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
+  const [justLanded, setJustLanded] = useState(false);
 
   // targetPosition is only valid in the 0-180 range; -1 means hidden
   const hasTarget =
@@ -187,9 +188,13 @@ export default function SpectrumDial({
   );
 
   const handlePointerUp = useCallback(() => {
+    if (isDragging) {
+      setJustLanded(true);
+      setTimeout(() => setJustLanded(false), 400);
+    }
     setIsDragging(false);
     setDragPos(null);
-  }, []);
+  }, [isDragging]);
 
   const isFreeDragging = isDragging && dragPos !== null;
 
@@ -407,7 +412,7 @@ export default function SpectrumDial({
                 animate={{
                   cx: ballX,
                   cy: ballY,
-                  r: ballRadius,
+                  r: justLanded ? [ballRadius * 1.3, ballRadius] : ballRadius,
                 }}
                 transition={
                   isFreeDragging
@@ -422,7 +427,9 @@ export default function SpectrumDial({
                 style={{
                   filter: isFreeDragging
                     ? "drop-shadow(0 4px 12px rgba(0,0,0,0.3))"
-                    : "none",
+                    : justLanded
+                      ? "drop-shadow(0 2px 6px rgba(0,0,0,0.2))"
+                      : "none",
                 }}
               />
 
@@ -437,6 +444,20 @@ export default function SpectrumDial({
                   strokeWidth={2}
                   opacity={0.12}
                   strokeLinecap="round"
+                />
+              )}
+
+              {/* Landing pulse ring — appears briefly when ball snaps back */}
+              {justLanded && (
+                <motion.circle
+                  cx={arcTip.x}
+                  cy={arcTip.y}
+                  initial={{ r: 6, opacity: 0.4 }}
+                  animate={{ r: 24, opacity: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut" }}
+                  fill="none"
+                  stroke={lockedIn ? "#4CAF50" : "#E8553A"}
+                  strokeWidth={2}
                 />
               )}
             </g>
