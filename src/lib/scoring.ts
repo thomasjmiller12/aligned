@@ -25,11 +25,11 @@ export function getScoreLabel(score: number): string {
 export function getScoreColor(score: number): string {
   switch (score) {
     case 4:
-      return "#FFD700";
+      return "#FBBF24";
     case 3:
-      return "#FF9800";
+      return "#2DD4BF";
     case 2:
-      return "#FF7043";
+      return "#A7F3D0";
     default:
       return "#6B6B6B";
   }

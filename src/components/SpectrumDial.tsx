@@ -58,10 +58,12 @@ function AnimatedArrow({
   arrow,
   showScore,
   targetPosition,
+  scoreYOffset,
 }: {
   arrow: PlayerArrow;
   showScore: boolean;
   targetPosition?: number;
+  scoreYOffset: number;
 }) {
   const tipPos = posOnArc(arrow.position, RADIUS - 8);
   const validTarget =
@@ -107,7 +109,7 @@ function AnimatedArrow({
         {arrow.initial}
       </motion.text>
 
-      {/* Floating score on reveal */}
+      {/* Floating score on reveal — offset to avoid overlap with nearby arrows */}
       {showScore && (
         <motion.g
           initial={{ opacity: 0, y: 0 }}
@@ -116,10 +118,10 @@ function AnimatedArrow({
         >
           <motion.text
             x={dotPos.x}
-            y={dotPos.y - 16}
+            y={dotPos.y - 16 + scoreYOffset}
             textAnchor="middle"
             fill={scored
-              ? (score === 4 ? "#FFD700" : score === 3 ? "#FF9800" : "#FF7043")
+              ? (score === 4 ? "#FBBF24" : score === 3 ? "#2DD4BF" : "#A7F3D0")
               : "#999"
             }
             fontSize={scored ? 13 : 11}
@@ -260,19 +262,15 @@ export default function SpectrumDial({
         onPointerCancel={handlePointerUp}
       >
         <defs>
-          <linearGradient id="arcGradient" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#F4A261" />
-            <stop offset="50%" stopColor="#E8553A" />
-            <stop offset="100%" stopColor="#2A9D8F" />
-          </linearGradient>
-          <radialGradient id="bgGlow" cx="50%" cy="100%">
-            <stop offset="0%" stopColor="#FFF8F0" />
-            <stop offset="100%" stopColor="#FFF0E0" />
+          <radialGradient id="bgGlow" cx="50%" cy="100%" r="80%" fx="50%" fy="100%">
+            <stop offset="0%" stopColor="#F5E6D3" stopOpacity={0.4} />
+            <stop offset="60%" stopColor="#FFF8F0" stopOpacity={0.25} />
+            <stop offset="100%" stopColor="#FFF8F0" stopOpacity={0.08} />
           </radialGradient>
         </defs>
 
-        {/* Subtle background fill */}
-        <path d={bgArcPath} fill="url(#bgGlow)" opacity={0.5} />
+        {/* Subtle warm cream gradient fill across semicircle */}
+        <path d={bgArcPath} fill="url(#bgGlow)" />
 
         {/* Tick marks */}
         {Array.from({ length: 37 }).map((_, i) => {
@@ -293,13 +291,14 @@ export default function SpectrumDial({
           );
         })}
 
-        {/* Main arc */}
+        {/* Main arc — neutral tone, scoring zones are the visual focus */}
         <path
           d={arcPath}
           fill="none"
-          stroke="url(#arcGradient)"
+          stroke="#D4C4B0"
           strokeWidth={10}
           strokeLinecap="round"
+          opacity={0.5}
         />
 
         {/* Arc highlight near ghost position during drag */}
@@ -329,11 +328,11 @@ export default function SpectrumDial({
           const R_INNER = RADIUS - 5;
           // Order: 4pt center first, then 3pt pair, then 2pt pair
           const zones = [
-            { from: -4, to: 4, color: "#FFD639", opacity: 1, delay: 0.1 },
-            { from: -12, to: -4, color: "#007CBE", opacity: 1, delay: 0.22 },
-            { from: 4, to: 12, color: "#007CBE", opacity: 1, delay: 0.22 },
-            { from: -20, to: -12, color: "#9CA3AF", opacity: 1, delay: 0.34 },
-            { from: 12, to: 20, color: "#9CA3AF", opacity: 1, delay: 0.34 },
+            { from: -4, to: 4, color: "#FBBF24", opacity: 1, delay: 0.1 },
+            { from: -12, to: -4, color: "#2DD4BF", opacity: 1, delay: 0.22 },
+            { from: 4, to: 12, color: "#2DD4BF", opacity: 1, delay: 0.22 },
+            { from: -20, to: -12, color: "#A7F3D0", opacity: 1, delay: 0.34 },
+            { from: 12, to: 20, color: "#A7F3D0", opacity: 1, delay: 0.34 },
           ];
           function bandPath(fromDeg: number, toDeg: number) {
             const s = Math.max(0, tp + fromDeg);
@@ -390,15 +389,30 @@ export default function SpectrumDial({
           </motion.g>
         )}
 
-        {/* Player arrows */}
-        {playerArrows.map((arrow) => (
-          <AnimatedArrow
-            key={arrow.id}
-            arrow={arrow}
-            showScore={!!showScoringWedge}
-            targetPosition={targetPosition}
-          />
-        ))}
+        {/* Player arrows — compute Y offsets to prevent overlapping score labels */}
+        {(() => {
+          const sorted = [...playerArrows].sort((a, b) => a.position - b.position);
+          const offsets = new Map<string, number>();
+          const MIN_DEG_GAP = 8;
+          for (let i = 0; i < sorted.length; i++) {
+            let yOff = 0;
+            for (let j = 0; j < i; j++) {
+              if (Math.abs(sorted[i].position - sorted[j].position) < MIN_DEG_GAP) {
+                yOff -= 14;
+              }
+            }
+            offsets.set(sorted[i].id, yOff);
+          }
+          return playerArrows.map((arrow) => (
+            <AnimatedArrow
+              key={arrow.id}
+              arrow={arrow}
+              showScore={!!showScoringWedge}
+              targetPosition={targetPosition}
+              scoreYOffset={offsets.get(arrow.id) ?? 0}
+            />
+          ));
+        })()}
 
         {/* My guess pointer */}
         {myPosition !== undefined && interactive && (() => {
