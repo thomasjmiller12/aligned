@@ -123,6 +123,8 @@ export default function SpectrumDial({
 }: SpectrumDialProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  // Raw pointer position in SVG-space during drag (null when not dragging)
+  const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
 
   // targetPosition is only valid in the 0-180 range; -1 means hidden
   const hasTarget =
@@ -145,29 +147,48 @@ export default function SpectrumDial({
     []
   );
 
+  const clientToSvg = useCallback(
+    (clientX: number, clientY: number): { x: number; y: number } | null => {
+      if (!svgRef.current) return null;
+      const rect = svgRef.current.getBoundingClientRect();
+      const scaleX = rect.width / SIZE;
+      const scaleY = rect.height / (SIZE - 20);
+      return {
+        x: (clientX - rect.left) / scaleX,
+        y: (clientY - rect.top) / scaleY,
+      };
+    },
+    []
+  );
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!interactive || lockedIn) return;
       e.preventDefault();
       (e.target as Element).setPointerCapture?.(e.pointerId);
       setIsDragging(true);
+      const svgPos = clientToSvg(e.clientX, e.clientY);
+      if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
       if (angle !== null) onPositionChange?.(angle);
     },
-    [interactive, lockedIn, getAngleFromEvent, onPositionChange]
+    [interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange]
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!isDragging || !interactive || lockedIn) return;
+      const svgPos = clientToSvg(e.clientX, e.clientY);
+      if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
       if (angle !== null) onPositionChange?.(angle);
     },
-    [isDragging, interactive, lockedIn, getAngleFromEvent, onPositionChange]
+    [isDragging, interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange]
   );
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
+    setDragPos(null);
   }, []);
 
   const arcStart = posOnArc(0, RADIUS);
