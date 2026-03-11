@@ -61,4 +61,15 @@ export default defineSchema({
   })
     .index("by_round", ["roundId"])
     .index("by_round_player", ["roundId", "playerId"]),
+
+  ripples: defineTable({
+    gameId: v.id("games"),
+    playerId: v.id("players"),
+    x: v.number(),        // 0-1 normalized screen position
+    y: v.number(),        // 0-1 normalized screen position
+    color: v.string(),    // player's hex color
+    createdAt: v.number(), // Date.now() timestamp
+  })
+    .index("by_game", ["gameId"])
+    .index("by_game_time", ["gameId", "createdAt"]),
 });
