@@ -74,9 +74,9 @@ export const autoLockGuesses = internalMutation({
     let roundScore = 0;
     for (const guess of guesses) {
       const diff = Math.abs(guess.position - round.targetPosition);
-      if (diff <= 2) roundScore += 4;
-      else if (diff <= 6) roundScore += 3;
-      else if (diff <= 12) roundScore += 2;
+      if (diff <= 5) roundScore += 4;
+      else if (diff <= 10) roundScore += 3;
+      else if (diff <= 15) roundScore += 2;
     }
 
     await ctx.db.patch(round._id, { status: "revealing" });

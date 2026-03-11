@@ -245,6 +245,40 @@ export const lockGuess = mutation({
 
     if (!guess) throw new Error("No guess to lock");
     await ctx.db.patch(guess._id, { lockedIn: true });
+
+    // Auto-reveal when all guessers have locked in
+    const game = await ctx.db.get(round.gameId);
+    if (!game || game.status !== "guessing") return;
+
+    const players = await ctx.db
+      .query("players")
+      .withIndex("by_game", (q) => q.eq("gameId", round.gameId))
+      .collect();
+    const totalGuessers = players.length - 1; // exclude clue giver
+
+    const allGuesses = await ctx.db
+      .query("guesses")
+      .withIndex("by_round", (q) => q.eq("roundId", roundId))
+      .collect();
+    const lockedCount = allGuesses.filter((g) => g.lockedIn).length;
+
+    if (lockedCount >= totalGuessers && totalGuessers > 0) {
+      // Everyone locked — auto-reveal
+      let roundScore = 0;
+      for (const g of allGuesses) {
+        const diff = Math.abs(g.position - round.targetPosition);
+        if (diff <= 5) roundScore += 4;
+        else if (diff <= 10) roundScore += 3;
+        else if (diff <= 15) roundScore += 2;
+      }
+
+      await ctx.db.patch(round._id, { status: "revealing" });
+      await ctx.db.patch(game._id, {
+        status: "revealing",
+        teamScore: game.teamScore + roundScore,
+        timerEndsAt: undefined,
+      });
+    }
   },
 });
 
@@ -329,13 +363,13 @@ export const revealRound = mutation({
       }
     }
 
-    // Calculate scores
+    // Calculate scores (±5°=4pt, ±10°=3pt, ±15°=2pt)
     let roundScore = 0;
     for (const guess of guesses) {
       const diff = Math.abs(guess.position - round.targetPosition);
-      if (diff <= 2) roundScore += 4;
-      else if (diff <= 6) roundScore += 3;
-      else if (diff <= 12) roundScore += 2;
+      if (diff <= 5) roundScore += 4;
+      else if (diff <= 10) roundScore += 3;
+      else if (diff <= 15) roundScore += 2;
     }
 
     await ctx.db.patch(round._id, { status: "revealing" });

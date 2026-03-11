@@ -36,3 +36,4 @@ feature-logs/
 
 # Convex
 .convex/
+.vercel

@@ -27,8 +27,6 @@ const SIZE = 340;
 const CENTER_X = SIZE / 2;
 const CENTER_Y = SIZE - 30;
 const RADIUS = SIZE / 2 - 40;
-const INNER_RADIUS = RADIUS - 15;
-
 function degToRad(deg: number): number {
   return ((180 - deg) * Math.PI) / 180;
 }
@@ -41,25 +39,24 @@ function posOnArc(deg: number, r: number): { x: number; y: number } {
   };
 }
 
-function wedgePath(
+function piePath(
+  centerX: number,
+  centerY: number,
   startDeg: number,
   endDeg: number,
-  outerR: number,
-  innerR: number
+  r: number
 ): string {
-  const s1 = posOnArc(startDeg, outerR);
-  const e1 = posOnArc(endDeg, outerR);
-  const s2 = posOnArc(endDeg, innerR);
-  const e2 = posOnArc(startDeg, innerR);
+  const s = posOnArc(startDeg, r);
+  const e = posOnArc(endDeg, r);
   const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
-  return `M ${s1.x} ${s1.y} A ${outerR} ${outerR} 0 ${largeArc} 1 ${e1.x} ${e1.y} L ${s2.x} ${s2.y} A ${innerR} ${innerR} 0 ${largeArc} 0 ${e2.x} ${e2.y} Z`;
+  return `M ${centerX} ${centerY} L ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y} Z`;
 }
 
 function getScore(guessDeg: number, targetDeg: number): number {
   const diff = Math.abs(guessDeg - targetDeg);
-  if (diff <= 2) return 4;
-  if (diff <= 6) return 3;
-  if (diff <= 12) return 2;
+  if (diff <= 5) return 4;
+  if (diff <= 10) return 3;
+  if (diff <= 15) return 2;
   return 0;
 }
 
@@ -72,8 +69,7 @@ function AnimatedArrow({
   showScore: boolean;
   targetPosition?: number;
 }) {
-  const tipPos = posOnArc(arrow.position, RADIUS - 18);
-  const circlePos = posOnArc(arrow.position, RADIUS - 10);
+  const tipPos = posOnArc(arrow.position, RADIUS - 8);
   const validTarget =
     targetPosition !== undefined && targetPosition >= 0;
   const score =
@@ -92,50 +88,16 @@ function AnimatedArrow({
         stroke={arrow.color}
         strokeWidth={2.5}
         strokeLinecap="round"
-        opacity={arrow.lockedIn ? 1 : 0.5}
+        opacity={arrow.lockedIn ? 0.5 : 0.25}
       />
-      <motion.circle
-        animate={{
-          cx: circlePos.x,
-          cy: circlePos.y,
-          scale: scored ? [1, 1.3, 1] : 1,
-        }}
-        transition={
-          scored
-            ? {
-                scale: { delay: 1.2, duration: 0.5, repeat: 2 },
-                cx: { type: "spring", stiffness: 120, damping: 20 },
-                cy: { type: "spring", stiffness: 120, damping: 20 },
-              }
-            : {
-                cx: { type: "spring", stiffness: 120, damping: 20 },
-                cy: { type: "spring", stiffness: 120, damping: 20 },
-              }
-        }
-        r={11}
-        fill={arrow.color}
-        stroke={scored ? "#FFD700" : "white"}
-        strokeWidth={scored ? 3 : 2}
-      />
-      <motion.text
-        animate={{ x: circlePos.x, y: circlePos.y }}
-        transition={{ type: "spring", stiffness: 120, damping: 20 }}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fill="white"
-        fontSize={9}
-        fontWeight="bold"
-      >
-        {arrow.initial}
-      </motion.text>
 
-      {/* Floating score */}
+      {/* Floating score on reveal */}
       {showScore && scored && (
         <motion.text
-          initial={{ opacity: 0, y: circlePos.y }}
-          animate={{ opacity: [0, 1, 1, 0], y: circlePos.y - 30 }}
+          initial={{ opacity: 0, y: tipPos.y }}
+          animate={{ opacity: [0, 1, 1, 0], y: tipPos.y - 25 }}
           transition={{ delay: 1.5, duration: 1.5 }}
-          x={circlePos.x}
+          x={tipPos.x}
           textAnchor="middle"
           fill={score === 4 ? "#FFD700" : score === 3 ? "#FF9800" : "#FF7043"}
           fontSize={14}
@@ -174,9 +136,11 @@ export default function SpectrumDial({
       const scaleY = rect.height / (SIZE - 20);
       const x = (clientX - rect.left) / scaleX - CENTER_X;
       const y = CENTER_Y - (clientY - rect.top) / scaleY;
-      let angle = Math.atan2(y, x) * (180 / Math.PI);
-      angle = Math.max(5, Math.min(175, angle));
-      return Math.round(angle);
+      const rawAngle = Math.atan2(y, x) * (180 / Math.PI);
+      // Flip: atan2 gives 0°=right, but our dial maps 0°=left
+      const angle = 180 - rawAngle;
+      const clamped = Math.max(5, Math.min(175, angle));
+      return Math.round(clamped);
     },
     []
   );
@@ -267,83 +231,69 @@ export default function SpectrumDial({
           strokeLinecap="round"
         />
 
-        {/* Scoring wedge (reveal) */}
+        {/* Scoring wedge — radial pie slices from center (reveal) */}
         {showScoringWedge && hasTarget && (
           <motion.g
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.8, delay: 0.5 }}
           >
-            {/* 2pt zone */}
+            {/* 2pt zone — outermost */}
             <motion.path
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.3 }}
+              animate={{ opacity: 0.2 }}
               transition={{ duration: 0.4, delay: 0.5 }}
-              d={wedgePath(
-                Math.max(0, targetPosition - 12),
-                Math.min(180, targetPosition + 12),
-                RADIUS - 2,
-                INNER_RADIUS - 25
+              d={piePath(
+                CENTER_X,
+                CENTER_Y,
+                Math.max(0, targetPosition - 15),
+                Math.min(180, targetPosition + 15),
+                RADIUS + 2
               )}
               fill="#FF7043"
             />
             {/* 3pt zone */}
             <motion.path
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4 }}
+              animate={{ opacity: 0.3 }}
               transition={{ duration: 0.4, delay: 0.7 }}
-              d={wedgePath(
-                Math.max(0, targetPosition - 6),
-                Math.min(180, targetPosition + 6),
-                RADIUS - 2,
-                INNER_RADIUS - 25
+              d={piePath(
+                CENTER_X,
+                CENTER_Y,
+                Math.max(0, targetPosition - 10),
+                Math.min(180, targetPosition + 10),
+                RADIUS + 2
               )}
               fill="#FF9800"
             />
             {/* 4pt zone (bullseye) */}
             <motion.path
               initial={{ opacity: 0 }}
-              animate={{ opacity: 0.55 }}
+              animate={{ opacity: 0.4 }}
               transition={{ duration: 0.4, delay: 0.9 }}
-              d={wedgePath(
-                Math.max(0, targetPosition - 2),
-                Math.min(180, targetPosition + 2),
-                RADIUS - 2,
-                INNER_RADIUS - 25
+              d={piePath(
+                CENTER_X,
+                CENTER_Y,
+                Math.max(0, targetPosition - 5),
+                Math.min(180, targetPosition + 5),
+                RADIUS + 2
               )}
               fill="#FFD700"
             />
-          </motion.g>
-        )}
-
-        {/* Target line (reveal) */}
-        {showScoringWedge && hasTarget && (
-          <>
+            {/* Target line */}
             <motion.line
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3, delay: 1.0 }}
               x1={CENTER_X}
               y1={CENTER_Y}
-              x2={posOnArc(targetPosition, RADIUS + 10).x}
-              y2={posOnArc(targetPosition, RADIUS + 10).y}
+              x2={posOnArc(targetPosition, RADIUS + 12).x}
+              y2={posOnArc(targetPosition, RADIUS + 12).y}
               stroke="#FFD700"
               strokeWidth={3}
               strokeLinecap="round"
             />
-            {/* Target pip */}
-            <motion.circle
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", delay: 1.0, stiffness: 300 }}
-              cx={posOnArc(targetPosition, RADIUS + 14).x}
-              cy={posOnArc(targetPosition, RADIUS + 14).y}
-              r={7}
-              fill="#FFD700"
-              stroke="white"
-              strokeWidth={2}
-            />
-          </>
+          </motion.g>
         )}
 
         {/* Target position indicator (clue phase — shown to clue-giver) */}

@@ -6,8 +6,8 @@ import { Doc } from "../../../convex/_generated/dataModel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Timer from "../Timer";
 import SpectrumDial from "../SpectrumDial";
-import { Lock, Eye, Sparkles } from "lucide-react";
-import { motion } from "framer-motion";
+import { Lock, Eye } from "lucide-react";
+
 
 interface GuessingPhaseProps {
   game: Doc<"games">;
@@ -185,22 +185,7 @@ export default function GuessingPhase({
         {lockedCount} / {totalGuessers} locked in
       </p>
 
-      {/* Host Reveal Button */}
-      {isHost && allLockedIn && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <button
-            onClick={handleReveal}
-            disabled={revealPending}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-          >
-            <Sparkles className="h-5 w-5" />
-            {revealPending ? "Revealing..." : "Reveal!"}
-          </button>
-        </motion.div>
-      )}
+      {/* Host can reveal early before everyone locks in */}
       {isHost && !allLockedIn && (
         <button
           onClick={handleReveal}
