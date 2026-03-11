@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #FFF8F0;
+  --color-surface: #FFFFFF;
+  --color-primary: #E8553A;
+  --color-secondary: #F4A261;
+  --color-accent: #2A9D8F;
+  --color-text: #2D2D2D;
+  --color-text-secondary: #6B6B6B;
+  --color-success: #4CAF50;
+  --color-gold: #FFD700;
+  --color-score-orange: #FF9800;
+  --color-score-coral: #FF7043;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+html {
+  /* Prevent pull-to-refresh on mobile when interacting with dial */
+  overscroll-behavior-y: contain;
+}
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  /* Safe area insets for notched phones */
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Tabular figures for score numbers */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smooth scrolling */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
