@@ -62,7 +62,7 @@ export default function CluePhase({
   const allSubmitted = submittedCount === players.length;
 
   return (
-    <div className="space-y-6 pt-4 text-center">
+    <div className="space-y-3 pt-1 text-center">
       <Timer
         endsAt={game.timerEndsAt}
         totalSeconds={game.settings.clueTimerSeconds}

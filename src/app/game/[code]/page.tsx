@@ -110,7 +110,7 @@ export default function GamePage() {
       )}
 
       <main className="flex flex-1 flex-col items-center px-4 pb-8">
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="popLayout">
           {game.status === "lobby" && (
             <motion.div
               key="lobby"
@@ -151,7 +151,8 @@ export default function GamePage() {
               key={`guessing-${game.currentRound}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
               className="w-full max-w-lg"
             >
               <GuessingPhase
@@ -167,9 +168,10 @@ export default function GamePage() {
           {game.status === "revealing" && currentRound && (
             <motion.div
               key={`revealing-${game.currentRound}`}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
               className="w-full max-w-lg"
             >
               <RevealPhase

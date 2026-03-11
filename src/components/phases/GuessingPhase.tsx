@@ -124,7 +124,7 @@ export default function GuessingPhase({
     totalGuessers > 0;
 
   return (
-    <div className="space-y-5 pt-4 text-center">
+    <div className="space-y-3 pt-1 text-center">
       <Timer
         endsAt={game.timerEndsAt}
         totalSeconds={game.settings.guessTimerSeconds}
