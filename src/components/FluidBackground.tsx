@@ -184,11 +184,18 @@ export default function FluidBackground({
       createRipple(e.clientX, e.clientY);
     }
 
+    // Prevent native drag from freezing requestAnimationFrame
+    function handleDragStart(e: DragEvent) {
+      e.preventDefault();
+    }
+
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("dragstart", handleDragStart);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("dragstart", handleDragStart);
     };
   }, []);
 
