@@ -144,6 +144,7 @@ export default function GuessingPhase({
       <SpectrumDial
         leftLabel={round.spectrumLeft}
         rightLabel={round.spectrumRight}
+        targetPosition={isClueGiver ? round.targetPosition : undefined}
         interactive={canGuess}
         myPosition={canGuess ? myPosition : undefined}
         onPositionChange={canGuess ? handlePositionChange : undefined}
