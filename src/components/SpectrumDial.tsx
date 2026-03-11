@@ -324,6 +324,7 @@ export default function SpectrumDial({
 
         {/* Scoring zones — arc band wedges, progressive reveal from center (reveal) */}
         {showScoringWedge && hasTarget && (() => {
+          const tp = targetPosition!;
           const R_OUTER = RADIUS + 5;
           const R_INNER = RADIUS - 5;
           // Order: 4pt center first, then 3pt pair, then 2pt pair
@@ -335,8 +336,8 @@ export default function SpectrumDial({
             { from: 12, to: 20, color: "#9CA3AF", opacity: 1, delay: 0.34 },
           ];
           function bandPath(fromDeg: number, toDeg: number) {
-            const s = Math.max(0, targetPosition + fromDeg);
-            const e = Math.min(180, targetPosition + toDeg);
+            const s = Math.max(0, tp + fromDeg);
+            const e = Math.min(180, tp + toDeg);
             if (s >= e) return null;
             const oS = posOnArc(s, R_OUTER);
             const oE = posOnArc(e, R_OUTER);
