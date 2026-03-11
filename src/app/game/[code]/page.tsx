@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { getSessionId } from "@/lib/session";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import GameHeader from "@/components/GameHeader";
 import PlayerBar from "@/components/PlayerBar";
 import LobbyPhase from "@/components/phases/LobbyPhase";
@@ -15,6 +15,7 @@ import RevealPhase from "@/components/phases/RevealPhase";
 import GameOverPhase from "@/components/phases/GameOverPhase";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import FluidBackground from "@/components/FluidBackground";
 
 export default function GamePage() {
   const params = useParams();
@@ -38,6 +39,35 @@ export default function GamePage() {
     api.games.getMyPlayer,
     game && sessionId ? { gameId: game._id, sessionId } : "skip"
   );
+
+  const addRipple = useMutation(api.ripples.addRipple);
+  const recentRipples = useQuery(
+    api.ripples.getRecentRipples,
+    game ? { gameId: game._id } : "skip"
+  );
+
+  const handleRipple = useCallback(
+    (x: number, y: number) => {
+      if (!game || !myPlayer) return;
+      addRipple({
+        gameId: game._id,
+        playerId: myPlayer._id,
+        x,
+        y,
+        color: myPlayer.color,
+      });
+    },
+    [game, myPlayer, addRipple]
+  );
+
+  const remoteRipples = (recentRipples ?? [])
+    .filter((r) => myPlayer && r.playerId !== myPlayer._id)
+    .map((r) => ({
+      id: r._id,
+      x: r.x,
+      y: r.y,
+      color: r.color,
+    }));
 
   if (game === undefined || players === undefined) {
     return (
@@ -83,6 +113,13 @@ export default function GamePage() {
   }
 
   return (
+    <>
+    <FluidBackground
+      remoteRipples={remoteRipples}
+      onRipple={handleRipple}
+      playerColor={myPlayer?.color ?? "#E8553A"}
+      interactive={!!myPlayer}
+    />
     <div className="flex min-h-screen flex-col">
       <GameHeader
         code={game.code}
@@ -203,6 +240,7 @@ export default function GamePage() {
         </AnimatePresence>
       </main>
     </div>
+    </>
   );
 }
 
