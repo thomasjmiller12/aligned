@@ -72,4 +72,14 @@ export default defineSchema({
   })
     .index("by_game", ["gameId"])
     .index("by_game_time", ["gameId", "createdAt"]),
+
+  messages: defineTable({
+    gameId: v.id("games"),
+    playerId: v.id("players"),
+    playerName: v.string(),
+    playerColor: v.string(),
+    body: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_game_time", ["gameId", "createdAt"]),
 });

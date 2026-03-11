@@ -489,6 +489,15 @@ export const playAgain = mutation({
       await ctx.db.delete(round._id);
     }
 
+    // Delete chat messages
+    const messages = await ctx.db
+      .query("messages")
+      .withIndex("by_game_time", (q) => q.eq("gameId", gameId))
+      .collect();
+    for (const msg of messages) {
+      await ctx.db.delete(msg._id);
+    }
+
     // Reset game
     await ctx.db.patch(gameId, {
       status: "lobby",

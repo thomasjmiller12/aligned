@@ -16,6 +16,7 @@ import GameOverPhase from "@/components/phases/GameOverPhase";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import FluidBackground from "@/components/FluidBackground";
+import ChatPanel from "@/components/ChatPanel";
 
 export default function GamePage() {
   const params = useParams();
@@ -120,6 +121,13 @@ export default function GamePage() {
       playerColor={myPlayer?.color ?? "#E8553A"}
       interactive={!!myPlayer}
     />
+    {game && sessionId && myPlayer && (
+      <ChatPanel
+        gameId={game._id}
+        sessionId={sessionId}
+        myPlayerId={myPlayer._id}
+      />
+    )}
     <div className="flex min-h-screen flex-col">
       <GameHeader
         code={game.code}

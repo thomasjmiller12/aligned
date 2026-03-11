@@ -10,6 +10,7 @@
 
 import type * as crons from "../crons.js";
 import type * as games from "../games.js";
+import type * as messages from "../messages.js";
 import type * as ripples from "../ripples.js";
 import type * as spectrums from "../spectrums.js";
 import type * as timers from "../timers.js";
@@ -23,6 +24,7 @@ import type {
 declare const fullApi: ApiFromModules<{
   crons: typeof crons;
   games: typeof games;
+  messages: typeof messages;
   ripples: typeof ripples;
   spectrums: typeof spectrums;
   timers: typeof timers;
