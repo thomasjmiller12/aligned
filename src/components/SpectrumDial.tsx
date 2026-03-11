@@ -39,17 +39,11 @@ function posOnArc(deg: number, r: number): { x: number; y: number } {
   };
 }
 
-function piePath(
-  centerX: number,
-  centerY: number,
-  startDeg: number,
-  endDeg: number,
-  r: number
-): string {
+function arcBandPath(startDeg: number, endDeg: number, r: number): string {
   const s = posOnArc(startDeg, r);
   const e = posOnArc(endDeg, r);
   const largeArc = Math.abs(endDeg - startDeg) > 180 ? 1 : 0;
-  return `M ${centerX} ${centerY} L ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y} Z`;
+  return `M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y}`;
 }
 
 function getScore(guessDeg: number, targetDeg: number): number {
@@ -78,6 +72,8 @@ function AnimatedArrow({
       : 0;
   const scored = score > 0;
 
+  const dotPos = posOnArc(arrow.position, RADIUS + 18);
+
   return (
     <g>
       <motion.line
@@ -88,23 +84,50 @@ function AnimatedArrow({
         stroke={arrow.color}
         strokeWidth={2.5}
         strokeLinecap="round"
-        opacity={arrow.lockedIn ? 0.5 : 0.25}
+        opacity={arrow.lockedIn ? 0.5 : 0.3}
       />
 
+      {/* Player dot at arrow tip */}
+      <motion.circle
+        animate={{ cx: dotPos.x, cy: dotPos.y }}
+        transition={{ type: "spring", stiffness: 120, damping: 20 }}
+        r={11}
+        fill={arrow.color}
+        stroke="white"
+        strokeWidth={2}
+      />
+      <motion.text
+        animate={{ x: dotPos.x, y: dotPos.y + 4 }}
+        transition={{ type: "spring", stiffness: 120, damping: 20 }}
+        textAnchor="middle"
+        fill="white"
+        fontSize={11}
+        fontWeight="bold"
+      >
+        {arrow.initial}
+      </motion.text>
+
       {/* Floating score on reveal */}
-      {showScore && scored && (
-        <motion.text
-          initial={{ opacity: 0, y: tipPos.y }}
-          animate={{ opacity: [0, 1, 1, 0], y: tipPos.y - 25 }}
-          transition={{ delay: 1.5, duration: 1.5 }}
-          x={tipPos.x}
-          textAnchor="middle"
-          fill={score === 4 ? "#FFD700" : score === 3 ? "#FF9800" : "#FF7043"}
-          fontSize={14}
-          fontWeight="bold"
+      {showScore && (
+        <motion.g
+          initial={{ opacity: 0, y: 0 }}
+          animate={{ opacity: 1, y: -8 }}
+          transition={{ delay: 0.6, duration: 0.4, ease: "easeOut" }}
         >
-          +{score}
-        </motion.text>
+          <motion.text
+            x={dotPos.x}
+            y={dotPos.y - 16}
+            textAnchor="middle"
+            fill={scored
+              ? (score === 4 ? "#FFD700" : score === 3 ? "#FF9800" : "#FF7043")
+              : "#999"
+            }
+            fontSize={scored ? 13 : 11}
+            fontWeight="bold"
+          >
+            {scored ? `+${score}` : "Miss"}
+          </motion.text>
+        </motion.g>
       )}
     </g>
   );
@@ -298,70 +321,69 @@ export default function SpectrumDial({
           );
         })()}
 
-        {/* Scoring wedge — radial pie slices from center (reveal) */}
-        {showScoringWedge && hasTarget && (
-          <motion.g
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.8, delay: 0.5 }}
-          >
-            {/* 2pt zone — outermost */}
-            <motion.path
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.2 }}
-              transition={{ duration: 0.4, delay: 0.5 }}
-              d={piePath(
-                CENTER_X,
-                CENTER_Y,
-                Math.max(0, targetPosition - 15),
-                Math.min(180, targetPosition + 15),
-                RADIUS + 2
-              )}
-              fill="#FF7043"
-            />
-            {/* 3pt zone */}
-            <motion.path
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.3 }}
-              transition={{ duration: 0.4, delay: 0.7 }}
-              d={piePath(
-                CENTER_X,
-                CENTER_Y,
-                Math.max(0, targetPosition - 10),
-                Math.min(180, targetPosition + 10),
-                RADIUS + 2
-              )}
-              fill="#FF9800"
-            />
-            {/* 4pt zone (bullseye) */}
-            <motion.path
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.4 }}
-              transition={{ duration: 0.4, delay: 0.9 }}
-              d={piePath(
-                CENTER_X,
-                CENTER_Y,
-                Math.max(0, targetPosition - 5),
-                Math.min(180, targetPosition + 5),
-                RADIUS + 2
-              )}
-              fill="#FFD700"
-            />
-            {/* Target line */}
-            <motion.line
+
+        {/* Scoring zones — concentric rings inside the arc (reveal) */}
+        {showScoringWedge && hasTarget && (() => {
+          const R_NEAR = RADIUS - 10;
+          const R_CLOSE = RADIUS - 18;
+          const R_BULL = RADIUS - 26;
+          return (
+            <motion.g
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 1.0 }}
-              x1={CENTER_X}
-              y1={CENTER_Y}
-              x2={posOnArc(targetPosition, RADIUS + 12).x}
-              y2={posOnArc(targetPosition, RADIUS + 12).y}
-              stroke="#FFD700"
-              strokeWidth={3}
-              strokeLinecap="round"
-            />
-          </motion.g>
-        )}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              {/* 2pt near zone — outermost ring */}
+              <motion.path
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
+                d={arcBandPath(
+                  Math.max(0, targetPosition - 15),
+                  Math.min(180, targetPosition + 15),
+                  R_NEAR
+                )}
+                fill="none"
+                stroke="#FF7043"
+                strokeWidth={5}
+                strokeLinecap="round"
+                opacity={0.6}
+              />
+              {/* 3pt close zone — middle ring */}
+              <motion.path
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.35, delay: 0.25, ease: "easeOut" }}
+                d={arcBandPath(
+                  Math.max(0, targetPosition - 10),
+                  Math.min(180, targetPosition + 10),
+                  R_CLOSE
+                )}
+                fill="none"
+                stroke="#FF9800"
+                strokeWidth={5}
+                strokeLinecap="round"
+                opacity={0.7}
+              />
+              {/* 4pt bullseye — innermost ring, brightest */}
+              <motion.path
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: 1 }}
+                transition={{ duration: 0.3, delay: 0.35, ease: "easeOut" }}
+                d={arcBandPath(
+                  Math.max(0, targetPosition - 5),
+                  Math.min(180, targetPosition + 5),
+                  R_BULL
+                )}
+                fill="none"
+                stroke="#FFD700"
+                strokeWidth={5}
+                strokeLinecap="round"
+                opacity={0.85}
+              />
+            </motion.g>
+          );
+        })()}
 
         {/* Target position indicator (clue phase — shown to clue-giver) */}
         {hasTarget && !showScoringWedge && (

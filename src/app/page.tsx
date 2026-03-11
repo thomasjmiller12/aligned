@@ -82,7 +82,7 @@ export default function LandingPage() {
         </div>
 
         {/* Main Card */}
-        <div className="rounded-2xl bg-white p-8 shadow-lg shadow-black/5">
+        <div className="glass-card rounded-2xl p-8 shadow-lg shadow-black/5">
           {mode === "idle" && (
             <motion.div
               className="space-y-4"
@@ -120,7 +120,7 @@ export default function LandingPage() {
                 onChange={(e) => setName(e.target.value)}
                 maxLength={20}
                 autoFocus
-                className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-lg outline-none transition-colors focus:border-primary"
+                className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-lg outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleHost()}
               />
               {error && <p className="text-sm text-red-500">{error}</p>}
@@ -157,7 +157,7 @@ export default function LandingPage() {
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 maxLength={4}
                 autoFocus
-                className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-center text-2xl font-bold tracking-[0.3em] uppercase outline-none transition-colors focus:border-primary"
+                className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-center text-2xl font-bold tracking-[0.3em] uppercase outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleJoin()}
               />
               <input
@@ -166,7 +166,7 @@ export default function LandingPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 maxLength={20}
-                className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-lg outline-none transition-colors focus:border-primary"
+                className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-lg outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleJoin()}
               />
               {error && <p className="text-sm text-red-500">{error}</p>}

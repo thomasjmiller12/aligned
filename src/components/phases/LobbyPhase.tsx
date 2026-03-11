@@ -61,7 +61,7 @@ export default function LobbyPhase({
         </p>
         <button
           onClick={shareOrCopy}
-          className="inline-flex items-center gap-3 rounded-2xl bg-white px-8 py-4 text-4xl font-bold tracking-[0.4em] shadow-lg transition-all hover:shadow-xl active:scale-[0.98]"
+          className="inline-flex items-center gap-3 rounded-2xl bg-white/70 backdrop-blur-sm border border-white/50 px-8 py-4 text-4xl font-bold tracking-[0.4em] shadow-lg transition-all hover:shadow-xl active:scale-[0.98]"
         >
           {game.code}
           {copied ? (
@@ -73,7 +73,7 @@ export default function LobbyPhase({
       </div>
 
       {/* Players List */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm">
+      <div className="glass-card rounded-2xl p-6 shadow-sm">
         <div className="mb-4 flex items-center justify-center gap-2 text-text-secondary">
           <Users className="h-4 w-4" />
           <span className="text-sm font-medium">

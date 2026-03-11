@@ -81,8 +81,8 @@ export default function RevealPhase({
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 1 }}
-        className="rounded-2xl bg-white p-5 shadow-sm"
+        transition={{ delay: 0.5 }}
+        className="glass-card rounded-2xl p-5 shadow-sm"
       >
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-secondary">
           Round Scores
@@ -93,7 +93,7 @@ export default function RevealPhase({
               key={i}
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 1.2 + i * 0.15 }}
+              transition={{ delay: 0.6 + i * 0.1 }}
               className="flex items-center justify-between rounded-lg bg-cream px-3 py-2"
             >
               <div className="flex items-center gap-2">
@@ -124,7 +124,7 @@ export default function RevealPhase({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.8 }}
+          transition={{ delay: 1.0 }}
           className="mt-3 border-t pt-3 text-right"
         >
           <span className="text-sm text-text-secondary">Round total: </span>
@@ -137,7 +137,7 @@ export default function RevealPhase({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
+          transition={{ delay: 1.2 }}
         >
           <button
             onClick={async () => {
@@ -160,7 +160,7 @@ export default function RevealPhase({
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 2 }}
+          transition={{ delay: 1.2 }}
           className="text-sm text-text-secondary"
         >
           Waiting for host to continue...

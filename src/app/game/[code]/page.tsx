@@ -281,7 +281,7 @@ function JoinInlineForm({
             Join game <span className="font-bold tracking-widest">{code}</span>
           </p>
         </div>
-        <div className="rounded-2xl bg-white p-6 shadow-lg space-y-4">
+        <div className="glass-card rounded-2xl p-6 shadow-lg space-y-4">
           <input
             type="text"
             placeholder="Your name"
@@ -289,7 +289,7 @@ function JoinInlineForm({
             onChange={(e) => setName(e.target.value)}
             maxLength={20}
             autoFocus
-            className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-lg outline-none transition-colors focus:border-primary"
+            className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-lg outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
             onKeyDown={(e) => e.key === "Enter" && handleJoin()}
           />
           {error && <p className="text-sm text-red-500">{error}</p>}

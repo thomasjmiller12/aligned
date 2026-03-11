@@ -22,7 +22,16 @@ html {
 }
 
 body {
-  background-color: var(--color-cream);
+  background: linear-gradient(
+    145deg,
+    #FFF8F0 0%,
+    #FFE8DC 30%,
+    #FFF0E8 50%,
+    #E8F4F2 75%,
+    #FFF8F0 100%
+  );
+  background-attachment: fixed;
+  min-height: 100vh;
   color: var(--color-text);
   font-family: var(--font-sans);
   /* Safe area insets for notched phones */
@@ -30,6 +39,14 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
+}
+
+/* Glass card style */
+.glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 /* Tabular figures for score numbers */

@@ -90,7 +90,7 @@ export default function CluePhase({
                 onChange={(e) => setClueText(e.target.value)}
                 maxLength={50}
                 autoFocus
-                className="w-full rounded-xl border-2 border-gray-200 px-4 py-3 text-center text-xl font-semibold outline-none transition-colors focus:border-primary"
+                className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-center text-xl font-semibold outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleSubmitClue()}
               />
               <button
@@ -117,7 +117,7 @@ export default function CluePhase({
       )}
 
       {/* Status of other players */}
-      <div className="rounded-xl bg-white p-4 shadow-sm">
+      <div className="glass-card rounded-xl p-4 shadow-sm">
         <div className="mb-2 text-sm font-medium text-text-secondary">
           {submittedCount} / {players.length} clues submitted
         </div>

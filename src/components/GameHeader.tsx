@@ -32,7 +32,7 @@ export default function GameHeader({
       {/* Game Code */}
       <button
         onClick={copyCode}
-        className="flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-sm font-bold tracking-widest shadow-sm transition-all hover:shadow-md"
+        className="flex items-center gap-2 rounded-lg bg-white/70 backdrop-blur-sm border border-white/50 px-3 py-1.5 text-sm font-bold tracking-widest shadow-sm transition-all hover:shadow-md"
       >
         {code}
         {copied ? (

@@ -43,16 +43,16 @@ interface FluidBackgroundProps {
 // --- Constants ---
 
 const AMBIENT_COLORS = [
-  "rgba(232, 85, 58, 0.04)", // primary
-  "rgba(42, 157, 143, 0.04)", // accent
-  "rgba(244, 162, 97, 0.03)", // secondary
-  "rgba(124, 58, 237, 0.03)", // purple
+  "rgba(232, 85, 58, 0.10)", // primary
+  "rgba(42, 157, 143, 0.10)", // accent
+  "rgba(244, 162, 97, 0.08)", // secondary
+  "rgba(124, 58, 237, 0.08)", // purple
 ];
 
 const RIPPLE_DURATION = 2000;
-const RIPPLE_MAX_RADIUS = 150;
-const LOCAL_RIPPLE_OPACITY = 0.12;
-const REMOTE_RIPPLE_OPACITY = 0.08;
+const RIPPLE_MAX_RADIUS = 200;
+const LOCAL_RIPPLE_OPACITY = 0.25;
+const REMOTE_RIPPLE_OPACITY = 0.15;
 
 // --- Component ---
 
@@ -262,12 +262,12 @@ export default function FluidBackground({
           ctx!.beginPath();
           ctx!.arc(ripple.x, ripple.y, currentRadius, 0, Math.PI * 2);
           ctx!.strokeStyle = ripple.color;
-          ctx!.lineWidth = 2;
+          ctx!.lineWidth = 3;
           ctx!.globalAlpha = currentOpacity;
           ctx!.stroke();
 
           // Inner soft fill
-          ctx!.globalAlpha = currentOpacity * 0.3;
+          ctx!.globalAlpha = currentOpacity * 0.4;
           ctx!.fillStyle = ripple.color;
           ctx!.fill();
           ctx!.globalAlpha = 1;

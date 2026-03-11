@@ -73,7 +73,7 @@ export default function GameOverPhase({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="rounded-2xl bg-white p-5 shadow-sm"
+          className="glass-card rounded-2xl p-5 shadow-sm"
         >
           <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-secondary">
             Round Recap
