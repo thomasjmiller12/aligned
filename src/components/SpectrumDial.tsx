@@ -191,6 +191,8 @@ export default function SpectrumDial({
     setDragPos(null);
   }, []);
 
+  const isFreeDragging = isDragging && dragPos !== null;
+
   const arcStart = posOnArc(0, RADIUS);
   const arcEnd = posOnArc(180, RADIUS);
   const arcPath = `M ${arcStart.x} ${arcStart.y} A ${RADIUS} ${RADIUS} 0 0 1 ${arcEnd.x} ${arcEnd.y}`;
@@ -353,33 +355,90 @@ export default function SpectrumDial({
 
         {/* My guess pointer */}
         {myPosition !== undefined && interactive && (() => {
-          const tip = posOnArc(myPosition, RADIUS - 5);
+          const arcTip = posOnArc(myPosition, RADIUS - 5);
+
+          // Where the ball actually renders: free position during drag, arc during rest
+          const ballX = isFreeDragging ? dragPos!.x : arcTip.x;
+          const ballY = isFreeDragging ? dragPos!.y : arcTip.y;
+          const ballRadius = isFreeDragging ? 16 : 13;
+
           return (
             <g>
-              <motion.line
-                x1={CENTER_X}
-                y1={CENTER_Y}
-                animate={{ x2: tip.x, y2: tip.y }}
-                transition={{ type: "spring", stiffness: 200, damping: 25 }}
-                stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
-                strokeWidth={4}
-                strokeLinecap="round"
-              />
+              {/* Ghost dot on arc — visible only during free drag */}
+              {isFreeDragging && (
+                <circle
+                  cx={arcTip.x}
+                  cy={arcTip.y}
+                  r={6}
+                  fill={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  opacity={0.25}
+                />
+              )}
+
+              {/* Line from center to ball */}
+              {isFreeDragging ? (
+                /* Rubber band line — dashed, lighter during free drag */
+                <line
+                  x1={CENTER_X}
+                  y1={CENTER_Y}
+                  x2={dragPos!.x}
+                  y2={dragPos!.y}
+                  stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  strokeWidth={2}
+                  strokeDasharray="4 4"
+                  opacity={0.2}
+                  strokeLinecap="round"
+                />
+              ) : (
+                /* Normal solid line when resting on arc */
+                <motion.line
+                  x1={CENTER_X}
+                  y1={CENTER_Y}
+                  animate={{ x2: arcTip.x, y2: arcTip.y }}
+                  transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  strokeWidth={4}
+                  strokeLinecap="round"
+                />
+              )}
+
+              {/* The ball itself */}
               <motion.circle
-                animate={{ cx: tip.x, cy: tip.y }}
-                transition={{ type: "spring", stiffness: 200, damping: 25 }}
-                r={13}
+                animate={{
+                  cx: ballX,
+                  cy: ballY,
+                  r: ballRadius,
+                }}
+                transition={
+                  isFreeDragging
+                    ? { type: "tween", duration: 0 }
+                    : { type: "spring", stiffness: 300, damping: 20 }
+                }
                 fill={
-                  lockedIn ? "#4CAF50" : isDragging ? "#E8553A" : "#2D2D2D"
+                  lockedIn ? "#4CAF50" : isFreeDragging ? "#E8553A" : "#2D2D2D"
                 }
                 stroke="white"
                 strokeWidth={3}
                 style={{
-                  filter: isDragging
-                    ? "drop-shadow(0 2px 8px rgba(0,0,0,0.3))"
+                  filter: isFreeDragging
+                    ? "drop-shadow(0 4px 12px rgba(0,0,0,0.3))"
                     : "none",
                 }}
               />
+
+              {/* Faint line from center to ghost dot during drag */}
+              {isFreeDragging && (
+                <line
+                  x1={CENTER_X}
+                  y1={CENTER_Y}
+                  x2={arcTip.x}
+                  y2={arcTip.y}
+                  stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  strokeWidth={2}
+                  opacity={0.12}
+                  strokeLinecap="round"
+                />
+              )}
             </g>
           );
         })()}
