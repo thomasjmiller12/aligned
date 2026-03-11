@@ -178,6 +178,7 @@ export default function SpectrumDial({
       e.preventDefault();
       (e.target as Element).setPointerCapture?.(e.pointerId);
       setIsDragging(true);
+      if (navigator.vibrate) navigator.vibrate(10);
       const svgPos = clientToSvg(e.clientX, e.clientY);
       if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
@@ -198,13 +199,21 @@ export default function SpectrumDial({
   );
 
   const handlePointerUp = useCallback(() => {
-    if (isDragging) {
-      setJustLanded(true);
-      setTimeout(() => setJustLanded(false), 400);
+    if (isDragging && dragPos) {
+      // Only trigger landing animation for real drags (moved significantly from arc)
+      const arcTip = myPosition !== undefined ? posOnArc(myPosition, RADIUS - 5) : null;
+      const dist = arcTip
+        ? Math.hypot(dragPos.x - arcTip.x, dragPos.y - arcTip.y)
+        : 0;
+      if (dist > 15) {
+        setJustLanded(true);
+        setTimeout(() => setJustLanded(false), 400);
+        if (navigator.vibrate) navigator.vibrate([15, 30, 10]);
+      }
     }
     setIsDragging(false);
     setDragPos(null);
-  }, [isDragging]);
+  }, [isDragging, dragPos, myPosition]);
 
   const isFreeDragging = isDragging && dragPos !== null;
 
