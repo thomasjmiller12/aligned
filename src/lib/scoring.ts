@@ -3,9 +3,9 @@ export function calculateScore(
   targetPosition: number
 ): number {
   const diff = Math.abs(guessPosition - targetPosition);
-  if (diff <= 5) return 4;
-  if (diff <= 10) return 3;
-  if (diff <= 15) return 2;
+  if (diff <= 4) return 4;
+  if (diff <= 12) return 3;
+  if (diff <= 20) return 2;
   return 0;
 }
 

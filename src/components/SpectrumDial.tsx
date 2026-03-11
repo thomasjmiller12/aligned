@@ -48,9 +48,9 @@ function arcBandPath(startDeg: number, endDeg: number, r: number): string {
 
 function getScore(guessDeg: number, targetDeg: number): number {
   const diff = Math.abs(guessDeg - targetDeg);
-  if (diff <= 5) return 4;
-  if (diff <= 10) return 3;
-  if (diff <= 15) return 2;
+  if (diff <= 4) return 4;
+  if (diff <= 12) return 3;
+  if (diff <= 20) return 2;
   return 0;
 }
 
@@ -322,65 +322,45 @@ export default function SpectrumDial({
         })()}
 
 
-        {/* Scoring zones — concentric rings inside the arc (reveal) */}
+        {/* Scoring zones — arc band wedges, progressive reveal from center (reveal) */}
         {showScoringWedge && hasTarget && (() => {
-          const R_NEAR = RADIUS - 10;
-          const R_CLOSE = RADIUS - 18;
-          const R_BULL = RADIUS - 26;
+          const R_OUTER = RADIUS + 5;
+          const R_INNER = RADIUS - 5;
+          // Order: 4pt center first, then 3pt pair, then 2pt pair
+          const zones = [
+            { from: -4, to: 4, color: "#FFD639", opacity: 1, delay: 0.1 },
+            { from: -12, to: -4, color: "#007CBE", opacity: 1, delay: 0.22 },
+            { from: 4, to: 12, color: "#007CBE", opacity: 1, delay: 0.22 },
+            { from: -20, to: -12, color: "#9CA3AF", opacity: 1, delay: 0.34 },
+            { from: 12, to: 20, color: "#9CA3AF", opacity: 1, delay: 0.34 },
+          ];
+          function bandPath(fromDeg: number, toDeg: number) {
+            const s = Math.max(0, targetPosition + fromDeg);
+            const e = Math.min(180, targetPosition + toDeg);
+            if (s >= e) return null;
+            const oS = posOnArc(s, R_OUTER);
+            const oE = posOnArc(e, R_OUTER);
+            const iS = posOnArc(s, R_INNER);
+            const iE = posOnArc(e, R_INNER);
+            const la = (e - s) > 180 ? 1 : 0;
+            return `M ${oS.x} ${oS.y} A ${R_OUTER} ${R_OUTER} 0 ${la} 1 ${oE.x} ${oE.y} L ${iE.x} ${iE.y} A ${R_INNER} ${R_INNER} 0 ${la} 0 ${iS.x} ${iS.y} Z`;
+          }
           return (
-            <motion.g
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-            >
-              {/* 2pt near zone — outermost ring */}
-              <motion.path
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.4, delay: 0.15, ease: "easeOut" }}
-                d={arcBandPath(
-                  Math.max(0, targetPosition - 15),
-                  Math.min(180, targetPosition + 15),
-                  R_NEAR
-                )}
-                fill="none"
-                stroke="#FF7043"
-                strokeWidth={5}
-                strokeLinecap="round"
-                opacity={0.6}
-              />
-              {/* 3pt close zone — middle ring */}
-              <motion.path
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.35, delay: 0.25, ease: "easeOut" }}
-                d={arcBandPath(
-                  Math.max(0, targetPosition - 10),
-                  Math.min(180, targetPosition + 10),
-                  R_CLOSE
-                )}
-                fill="none"
-                stroke="#FF9800"
-                strokeWidth={5}
-                strokeLinecap="round"
-                opacity={0.7}
-              />
-              {/* 4pt bullseye — innermost ring, brightest */}
-              <motion.path
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 0.3, delay: 0.35, ease: "easeOut" }}
-                d={arcBandPath(
-                  Math.max(0, targetPosition - 5),
-                  Math.min(180, targetPosition + 5),
-                  R_BULL
-                )}
-                fill="none"
-                stroke="#FFD700"
-                strokeWidth={5}
-                strokeLinecap="round"
-                opacity={0.85}
-              />
+            <motion.g>
+              {zones.map((z, i) => {
+                const d = bandPath(z.from, z.to);
+                if (!d) return null;
+                return (
+                  <motion.path
+                    key={i}
+                    initial={{ opacity: 0, pathLength: 0 }}
+                    animate={{ opacity: z.opacity, pathLength: 1 }}
+                    transition={{ duration: 0.3, delay: z.delay, ease: "easeOut" }}
+                    d={d}
+                    fill={z.color}
+                  />
+                );
+              })}
             </motion.g>
           );
         })()}

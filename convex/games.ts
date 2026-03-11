@@ -133,7 +133,7 @@ export const startGame = mutation({
     // Create rounds with spectrums
     const spectrums = getRandomSpectrums(shuffled.length);
     for (let i = 0; i < shuffled.length; i++) {
-      const targetPosition = Math.floor(Math.random() * 141) + 20; // 20-160
+      const targetPosition = Math.floor(Math.random() * 173) + 4; // 4-176
       await ctx.db.insert("rounds", {
         gameId,
         roundIndex: i,
@@ -363,13 +363,13 @@ export const revealRound = mutation({
       }
     }
 
-    // Calculate scores (±5°=4pt, ±10°=3pt, ±15°=2pt)
+    // Calculate scores (±4°=4pt, ±12°=3pt, ±20°=2pt)
     let roundScore = 0;
     for (const guess of guesses) {
       const diff = Math.abs(guess.position - round.targetPosition);
-      if (diff <= 5) roundScore += 4;
-      else if (diff <= 10) roundScore += 3;
-      else if (diff <= 15) roundScore += 2;
+      if (diff <= 4) roundScore += 4;
+      else if (diff <= 12) roundScore += 3;
+      else if (diff <= 20) roundScore += 2;
     }
 
     await ctx.db.patch(round._id, { status: "revealing" });
