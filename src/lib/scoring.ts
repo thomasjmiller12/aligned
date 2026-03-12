@@ -1,11 +1,19 @@
+// Scoring zone thresholds (degrees from target) — single source of truth
+// These must stay in sync with convex/games.ts revealRound scoring
+export const SCORE_ZONES = {
+  BULLSEYE: 4,  // ±4° = 4pts
+  CLOSE: 12,    // ±12° = 3pts
+  NEAR: 20,     // ±20° = 2pts
+} as const;
+
 export function calculateScore(
   guessPosition: number,
   targetPosition: number
 ): number {
   const diff = Math.abs(guessPosition - targetPosition);
-  if (diff <= 4) return 4;
-  if (diff <= 12) return 3;
-  if (diff <= 20) return 2;
+  if (diff <= SCORE_ZONES.BULLSEYE) return 4;
+  if (diff <= SCORE_ZONES.CLOSE) return 3;
+  if (diff <= SCORE_ZONES.NEAR) return 2;
   return 0;
 }
 

@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { SCORE_ZONES } from "@/lib/scoring";
 
 interface PlayerArrow {
   id: string;
@@ -48,9 +49,9 @@ function arcBandPath(startDeg: number, endDeg: number, r: number): string {
 
 function getScore(guessDeg: number, targetDeg: number): number {
   const diff = Math.abs(guessDeg - targetDeg);
-  if (diff <= 4) return 4;
-  if (diff <= 12) return 3;
-  if (diff <= 20) return 2;
+  if (diff <= SCORE_ZONES.BULLSEYE) return 4;
+  if (diff <= SCORE_ZONES.CLOSE) return 3;
+  if (diff <= SCORE_ZONES.NEAR) return 2;
   return 0;
 }
 
@@ -327,12 +328,15 @@ export default function SpectrumDial({
           const R_OUTER = RADIUS + 5;
           const R_INNER = RADIUS - 5;
           // Order: 4pt center first, then 3pt pair, then 2pt pair
+          const B = SCORE_ZONES.BULLSEYE;
+          const C = SCORE_ZONES.CLOSE;
+          const N = SCORE_ZONES.NEAR;
           const zones = [
-            { from: -4, to: 4, color: "#FBBF24", opacity: 1, delay: 0.1 },
-            { from: -12, to: -4, color: "#2DD4BF", opacity: 1, delay: 0.22 },
-            { from: 4, to: 12, color: "#2DD4BF", opacity: 1, delay: 0.22 },
-            { from: -20, to: -12, color: "#A7F3D0", opacity: 1, delay: 0.34 },
-            { from: 12, to: 20, color: "#A7F3D0", opacity: 1, delay: 0.34 },
+            { from: -B, to: B, color: "#FBBF24", opacity: 1, delay: 0.1 },
+            { from: -C, to: -B, color: "#2DD4BF", opacity: 1, delay: 0.22 },
+            { from: B, to: C, color: "#2DD4BF", opacity: 1, delay: 0.22 },
+            { from: -N, to: -C, color: "#A7F3D0", opacity: 1, delay: 0.34 },
+            { from: C, to: N, color: "#A7F3D0", opacity: 1, delay: 0.34 },
           ];
           function bandPath(fromDeg: number, toDeg: number) {
             const s = Math.max(0, tp + fromDeg);

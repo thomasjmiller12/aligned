@@ -12,6 +12,10 @@ const PLAYER_COLORS = [
   "#06B6D4",
   "#84CC16",
   "#F97316",
+  "#8B5CF6",
+  "#14B8A6",
+  "#DC2626",
+  "#0EA5E9",
 ];
 
 function generateCode(): string {
@@ -94,7 +98,7 @@ export const joinGame = mutation({
       .withIndex("by_game", (q) => q.eq("gameId", game._id))
       .collect();
 
-    if (players.length >= 8) throw new Error("Game is full (max 8 players)");
+    if (players.length >= 12) throw new Error("Game is full (max 12 players)");
 
     const playerId = await ctx.db.insert("players", {
       gameId: game._id,
@@ -363,13 +367,14 @@ export const revealRound = mutation({
       }
     }
 
-    // Calculate scores (±4°=4pt, ±12°=3pt, ±20°=2pt)
+    // Scoring thresholds — keep in sync with src/lib/scoring.ts SCORE_ZONES
+    const BULLSEYE = 4, CLOSE = 12, NEAR = 20;
     let roundScore = 0;
     for (const guess of guesses) {
       const diff = Math.abs(guess.position - round.targetPosition);
-      if (diff <= 4) roundScore += 4;
-      else if (diff <= 12) roundScore += 3;
-      else if (diff <= 20) roundScore += 2;
+      if (diff <= BULLSEYE) roundScore += 4;
+      else if (diff <= CLOSE) roundScore += 3;
+      else if (diff <= NEAR) roundScore += 2;
     }
 
     await ctx.db.patch(round._id, { status: "revealing" });
