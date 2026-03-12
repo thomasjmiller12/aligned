@@ -22,6 +22,8 @@ interface SpectrumDialProps {
   interactive?: boolean;
   playerArrows?: PlayerArrow[];
   lockedIn?: boolean;
+  onDragMove?: (clientX: number, clientY: number) => void;
+  onDragEnd?: () => void;
 }
 
 const SIZE = 340;
@@ -146,6 +148,8 @@ export default function SpectrumDial({
   interactive = false,
   playerArrows = [],
   lockedIn = false,
+  onDragMove,
+  onDragEnd,
 }: SpectrumDialProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -209,8 +213,9 @@ export default function SpectrumDial({
       if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
       if (angle !== null) onPositionChange?.(angle);
+      onDragMove?.(e.clientX, e.clientY);
     },
-    [interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange]
+    [interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange, onDragMove]
   );
 
   const handlePointerMove = useCallback(
@@ -220,8 +225,9 @@ export default function SpectrumDial({
       if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
       if (angle !== null) onPositionChange?.(angle);
+      onDragMove?.(e.clientX, e.clientY);
     },
-    [isDragging, interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange]
+    [isDragging, interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange, onDragMove]
   );
 
   const handlePointerUp = useCallback(() => {
@@ -239,7 +245,8 @@ export default function SpectrumDial({
     }
     setIsDragging(false);
     setDragPos(null);
-  }, [isDragging, dragPos, myPosition]);
+    onDragEnd?.();
+  }, [isDragging, dragPos, myPosition, onDragEnd]);
 
   const isFreeDragging = isDragging && dragPos !== null;
 

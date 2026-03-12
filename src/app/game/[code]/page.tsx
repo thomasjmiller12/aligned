@@ -5,7 +5,7 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { getSessionId } from "@/lib/session";
 import { Id } from "../../../../convex/_generated/dataModel";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import GameHeader from "@/components/GameHeader";
 import PlayerBar from "@/components/PlayerBar";
 import LobbyPhase from "@/components/phases/LobbyPhase";
@@ -45,16 +45,20 @@ export default function GamePage() {
     game && game.status !== "lobby" ? { gameId: game._id } : "skip"
   );
 
-  const addRipple = useMutation(api.ripples.addRipple);
-  const recentRipples = useQuery(
-    api.ripples.getRecentRipples,
+  const updatePresence = useMutation(api.presence.updatePresence);
+  const presenceData = useQuery(
+    api.presence.getPresence,
     game ? { gameId: game._id } : "skip"
   );
 
-  const handleRipple = useCallback(
+  // Dial drag position ref — read by FluidBackground each frame (no re-renders)
+  const dialDragPosRef = useRef<{ x: number; y: number } | null>(null);
+  const getDialDragPos = useCallback(() => dialDragPosRef.current, []);
+
+  const handleLocalMove = useCallback(
     (x: number, y: number) => {
       if (!game || !myPlayer) return;
-      addRipple({
+      updatePresence({
         gameId: game._id,
         playerId: myPlayer._id,
         x,
@@ -62,16 +66,43 @@ export default function GamePage() {
         color: myPlayer.color,
       });
     },
-    [game, myPlayer, addRipple]
+    [game, myPlayer, updatePresence]
   );
 
-  const remoteRipples = (recentRipples ?? [])
+  const handleLocalBurst = useCallback(
+    (x: number, y: number) => {
+      if (!game || !myPlayer) return;
+      updatePresence({
+        gameId: game._id,
+        playerId: myPlayer._id,
+        x,
+        y,
+        color: myPlayer.color,
+        burst: true,
+      });
+    },
+    [game, myPlayer, updatePresence]
+  );
+
+  const handleDialDragMove = useCallback(
+    (clientX: number, clientY: number) => {
+      dialDragPosRef.current = { x: clientX, y: clientY };
+    },
+    []
+  );
+
+  const handleDialDragEnd = useCallback(() => {
+    dialDragPosRef.current = null;
+  }, []);
+
+  const remotePresence = (presenceData ?? [])
     .filter((r) => myPlayer && r.playerId !== myPlayer._id)
     .map((r) => ({
-      id: r._id,
+      playerId: r.playerId,
       x: r.x,
       y: r.y,
       color: r.color,
+      burstAt: r.burstAt,
     }));
 
   if (game === undefined || players === undefined) {
@@ -120,10 +151,12 @@ export default function GamePage() {
   return (
     <>
     <FluidBackground
-      remoteRipples={remoteRipples}
-      onRipple={handleRipple}
+      remotePresence={remotePresence}
+      onLocalMove={handleLocalMove}
+      onLocalBurst={handleLocalBurst}
       playerColor={myPlayer?.color ?? "#E8553A"}
       interactive={!!myPlayer}
+      getExternalPointerPos={getDialDragPos}
     />
     {game && sessionId && myPlayer && (
       <ChatPanel
@@ -212,6 +245,8 @@ export default function GamePage() {
                 players={players ?? []}
                 myPlayer={myPlayer ?? null}
                 sessionId={sessionId}
+                onDragMove={handleDialDragMove}
+                onDragEnd={handleDialDragEnd}
               />
             </motion.div>
           )}

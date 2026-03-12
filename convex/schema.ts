@@ -62,16 +62,17 @@ export default defineSchema({
     .index("by_round", ["roundId"])
     .index("by_round_player", ["roundId", "playerId"]),
 
-  ripples: defineTable({
+  presence: defineTable({
     gameId: v.id("games"),
     playerId: v.id("players"),
-    x: v.number(),        // 0-1 normalized screen position
-    y: v.number(),        // 0-1 normalized screen position
-    color: v.string(),    // player's hex color
-    createdAt: v.number(), // Date.now() timestamp
+    x: v.number(),         // 0-1 normalized screen position
+    y: v.number(),         // 0-1 normalized screen position
+    color: v.string(),     // player's hex color
+    updatedAt: v.number(), // Date.now() timestamp
+    burstAt: v.optional(v.number()), // timestamp of last burst event
   })
     .index("by_game", ["gameId"])
-    .index("by_game_time", ["gameId", "createdAt"]),
+    .index("by_game_player", ["gameId", "playerId"]),
 
   messages: defineTable({
     gameId: v.id("games"),

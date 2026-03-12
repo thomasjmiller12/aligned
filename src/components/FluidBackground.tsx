@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 
 // --- Types ---
 
@@ -14,30 +14,52 @@ interface Orb {
   speedY: number;
 }
 
-interface Ripple {
+interface TrailPoint {
   x: number;
   y: number;
-  radius: number;
-  maxRadius: number;
-  opacity: number;
+  time: number; // performance.now()
+  pressed: boolean; // pointer was down when this point was created
+}
+
+interface BurstParticle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number; // 1 → 0
+  size: number;
   color: string;
-  startTime: number;
+}
+
+interface PlayerState {
+  lastKnownX: number;
+  lastKnownY: number;
+  interpX: number;
+  interpY: number;
+  color: string;
+  trail: TrailPoint[];
+  lastBurstAt?: number;
 }
 
 interface FluidBackgroundProps {
-  /** Incoming ripples from other players (Convex) */
-  remoteRipples?: Array<{
-    id: string;
+  /** Remote players' presence data from Convex */
+  remotePresence?: Array<{
+    playerId: string;
     x: number; // 0-1 normalized
     y: number; // 0-1 normalized
     color: string;
+    burstAt?: number;
   }>;
-  /** Called when the local player creates a ripple */
-  onRipple?: (x: number, y: number) => void;
+  /** Called when local player moves (throttled by component) */
+  onLocalMove?: (x: number, y: number) => void;
+  /** Called when local player taps/clicks (burst event) */
+  onLocalBurst?: (x: number, y: number) => void;
   /** The local player's color */
   playerColor?: string;
   /** Whether touch interaction is enabled */
   interactive?: boolean;
+  /** Getter for external pointer position (e.g. dial drag) — called each frame */
+  getExternalPointerPos?: () => { x: number; y: number } | null;
 }
 
 // --- Constants ---
@@ -49,36 +71,100 @@ const AMBIENT_COLORS = [
   "rgba(124, 58, 237, 0.08)", // purple
 ];
 
-const RIPPLE_DURATION = 2000;
-const RIPPLE_MAX_RADIUS = 200;
-const LOCAL_RIPPLE_OPACITY = 0.25;
-const REMOTE_RIPPLE_OPACITY = 0.15;
+const TRAIL_MAX_POINTS = 15;
+const TRAIL_MAX_AGE = 600; // ms
+const TRAIL_HEAD_SIZE = 5;
+const TRAIL_HEAD_OPACITY = 0.5;
+const REMOTE_TRAIL_OPACITY = 0.35;
+
+const BURST_PARTICLE_COUNT = 16;
+const BURST_LIFETIME = 0.55; // seconds
+const BURST_SPEED = 180; // px/sec
+const BURST_GRAVITY = 140; // px/sec^2
+
+const LERP_FACTOR = 0.15;
+const PRESENCE_SEND_INTERVAL = 150; // ms
 
 // --- Component ---
 
 export default function FluidBackground({
-  remoteRipples = [],
-  onRipple,
+  remotePresence = [],
+  onLocalMove,
+  onLocalBurst,
   playerColor = "#E8553A",
   interactive = true,
+  getExternalPointerPos,
 }: FluidBackgroundProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const orbsRef = useRef<Orb[]>([]);
-  const ripplesRef = useRef<Ripple[]>([]);
+  const localTrailRef = useRef<TrailPoint[]>([]);
+  const burstParticlesRef = useRef<BurstParticle[]>([]);
+  const playersRef = useRef<Map<string, PlayerState>>(new Map());
   const animFrameRef = useRef<number>(0);
-  const lastRippleTime = useRef<number>(0);
-  const seenRemoteIds = useRef<Set<string>>(new Set());
+  const lastSendTime = useRef<number>(0);
+  const lastFrameTime = useRef<number>(0);
+  const pointerDownRef = useRef(false);
   const prefersReducedMotion = useRef(false);
 
-  // Store latest props in refs for document-level listeners
+  // Store latest props in refs for use in listeners/animation loop
   const playerColorRef = useRef(playerColor);
-  const onRippleRef = useRef(onRipple);
+  const onLocalMoveRef = useRef(onLocalMove);
+  const onLocalBurstRef = useRef(onLocalBurst);
   const interactiveRef = useRef(interactive);
+  const getExternalPointerPosRef = useRef(getExternalPointerPos);
   playerColorRef.current = playerColor;
-  onRippleRef.current = onRipple;
+  onLocalMoveRef.current = onLocalMove;
+  onLocalBurstRef.current = onLocalBurst;
   interactiveRef.current = interactive;
+  getExternalPointerPosRef.current = getExternalPointerPos;
 
-  // Initialize orbs + reduced motion detection
+  // --- Helpers ---
+
+  const addLocalTrailPoint = useCallback((x: number, y: number, pressed?: boolean) => {
+    const trail = localTrailRef.current;
+    const now = performance.now();
+    // Skip if too close to last point
+    const last = trail[trail.length - 1];
+    if (last && Math.hypot(x - last.x, y - last.y) < 3) return;
+    trail.push({ x, y, time: now, pressed: pressed ?? pointerDownRef.current });
+    if (trail.length > TRAIL_MAX_POINTS) {
+      localTrailRef.current = trail.slice(-TRAIL_MAX_POINTS);
+    }
+  }, []);
+
+  const throttleSendPresence = useCallback((x: number, y: number) => {
+    const now = performance.now();
+    if (now - lastSendTime.current < PRESENCE_SEND_INTERVAL) return;
+    lastSendTime.current = now;
+    onLocalMoveRef.current?.(x / window.innerWidth, y / window.innerHeight);
+  }, []);
+
+  const spawnBurst = useCallback(
+    (x: number, y: number, color: string, opacityMul: number) => {
+      const particles = burstParticlesRef.current;
+      for (let i = 0; i < BURST_PARTICLE_COUNT; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = BURST_SPEED * (0.4 + Math.random() * 0.6);
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 40, // slight upward bias
+          life: opacityMul,
+          size: 3 + Math.random() * 4,
+          color,
+        });
+      }
+      // Cap particles
+      if (particles.length > 120) {
+        burstParticlesRef.current = particles.slice(-80);
+      }
+    },
+    []
+  );
+
+  // --- Initialize orbs + reduced motion ---
+
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     prefersReducedMotion.current = mq.matches;
@@ -100,106 +186,102 @@ export default function FluidBackground({
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  // Process incoming remote ripples
+  // --- Process remote presence updates ---
+
   useEffect(() => {
-    for (const rr of remoteRipples) {
-      if (seenRemoteIds.current.has(rr.id)) continue;
-      seenRemoteIds.current.add(rr.id);
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    const players = playersRef.current;
+    const activeIds = new Set<string>();
 
-      const canvas = canvasRef.current;
-      if (!canvas) continue;
+    for (const rp of remotePresence) {
+      activeIds.add(rp.playerId);
 
-      ripplesRef.current.push({
-        x: rr.x * window.innerWidth,
-        y: rr.y * window.innerHeight,
-        radius: 0,
-        maxRadius: RIPPLE_MAX_RADIUS,
-        opacity: REMOTE_RIPPLE_OPACITY,
-        color: rr.color,
-        startTime: performance.now(),
-      });
-    }
-
-    // Trim seen IDs set to prevent memory growth
-    if (seenRemoteIds.current.size > 200) {
-      const arr = [...seenRemoteIds.current];
-      seenRemoteIds.current = new Set(arr.slice(-100));
-    }
-  }, [remoteRipples]);
-
-  // Document-level pointer listeners (avoids overlay blocking game UI)
-  useEffect(() => {
-    function createRipple(x: number, y: number) {
-      if (!interactiveRef.current) return;
-
-      const now = performance.now();
-      if (now - lastRippleTime.current < 333) return;
-      lastRippleTime.current = now;
-
-      ripplesRef.current.push({
-        x,
-        y,
-        radius: 0,
-        maxRadius: RIPPLE_MAX_RADIUS,
-        opacity: LOCAL_RIPPLE_OPACITY,
-        color: playerColorRef.current,
-        startTime: performance.now(),
-      });
-
-      // Cap ripple array
-      if (ripplesRef.current.length > 30) {
-        ripplesRef.current = ripplesRef.current.slice(-20);
+      let state = players.get(rp.playerId);
+      if (!state) {
+        state = {
+          lastKnownX: rp.x * w,
+          lastKnownY: rp.y * h,
+          interpX: rp.x * w,
+          interpY: rp.y * h,
+          color: rp.color,
+          trail: [],
+        };
+        players.set(rp.playerId, state);
+      } else {
+        state.lastKnownX = rp.x * w;
+        state.lastKnownY = rp.y * h;
+        state.color = rp.color;
       }
 
-      onRippleRef.current?.(x / window.innerWidth, y / window.innerHeight);
+      // Detect new burst
+      if (rp.burstAt && rp.burstAt !== state.lastBurstAt) {
+        state.lastBurstAt = rp.burstAt;
+        spawnBurst(rp.x * w, rp.y * h, rp.color, 0.5);
+      }
+    }
+
+    // Remove players who left
+    for (const [id] of players) {
+      if (!activeIds.has(id)) players.delete(id);
+    }
+  }, [remotePresence, spawnBurst]);
+
+  // --- Document-level pointer listeners ---
+
+  useEffect(() => {
+    function shouldSkip(e: PointerEvent): boolean {
+      const el = e.target as HTMLElement;
+      return !!(
+        el.closest("button") ||
+        el.closest("input") ||
+        el.closest("textarea") ||
+        el.closest("svg") ||
+        el.closest("a") ||
+        el.closest("[data-no-ripple]")
+      );
     }
 
     function handlePointerDown(e: PointerEvent) {
-      const el = e.target as HTMLElement;
-      // Skip if interacting with game UI elements
-      if (
-        el.closest("button") ||
-        el.closest("input") ||
-        el.closest("svg") ||
-        el.closest("a") ||
-        el.closest("[data-no-ripple]")
-      ) {
-        return;
-      }
-      createRipple(e.clientX, e.clientY);
+      pointerDownRef.current = true;
+      if (!interactiveRef.current || shouldSkip(e)) return;
+      addLocalTrailPoint(e.clientX, e.clientY, true);
+      spawnBurst(e.clientX, e.clientY, playerColorRef.current, 0.7);
+      onLocalBurstRef.current?.(
+        e.clientX / window.innerWidth,
+        e.clientY / window.innerHeight
+      );
+      throttleSendPresence(e.clientX, e.clientY);
+    }
+
+    function handlePointerUp() {
+      pointerDownRef.current = false;
     }
 
     function handlePointerMove(e: PointerEvent) {
-      if (e.buttons === 0) return;
-      const el = e.target as HTMLElement;
-      if (
-        el.closest("button") ||
-        el.closest("input") ||
-        el.closest("svg") ||
-        el.closest("a") ||
-        el.closest("[data-no-ripple]")
-      ) {
-        return;
-      }
-      createRipple(e.clientX, e.clientY);
+      if (!interactiveRef.current || shouldSkip(e)) return;
+      addLocalTrailPoint(e.clientX, e.clientY);
+      throttleSendPresence(e.clientX, e.clientY);
     }
 
-    // Prevent native drag from freezing requestAnimationFrame
     function handleDragStart(e: DragEvent) {
       e.preventDefault();
     }
 
     document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("pointermove", handlePointerMove);
     document.addEventListener("dragstart", handleDragStart);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("pointerup", handlePointerUp);
       document.removeEventListener("pointermove", handlePointerMove);
       document.removeEventListener("dragstart", handleDragStart);
     };
-  }, []);
+  }, [addLocalTrailPoint, throttleSendPresence, spawnBurst]);
 
-  // Animation loop
+  // --- Animation loop ---
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -219,11 +301,26 @@ export default function FluidBackground({
     let slowFrameCount = 0;
 
     function draw(now: number) {
-      const frameStart = performance.now();
+      const dt = lastFrameTime.current
+        ? Math.min((now - lastFrameTime.current) / 1000, 0.05) // cap at 50ms
+        : 0.016;
+      lastFrameTime.current = now;
+
       const w = window.innerWidth;
       const h = window.innerHeight;
-
       ctx!.clearRect(0, 0, w, h);
+
+      // --- External pointer (dial drag) ---
+      const extPos = getExternalPointerPosRef.current?.();
+      if (extPos) {
+        addLocalTrailPoint(extPos.x, extPos.y);
+        // Throttle presence sends for external pointer too
+        const sendNow = performance.now();
+        if (sendNow - lastSendTime.current >= PRESENCE_SEND_INTERVAL) {
+          lastSendTime.current = sendNow;
+          onLocalMoveRef.current?.(extPos.x / w, extPos.y / h);
+        }
+      }
 
       // --- Ambient orbs ---
       if (!prefersReducedMotion.current) {
@@ -232,7 +329,14 @@ export default function FluidBackground({
             w * (orb.x + 0.15 * Math.sin(now * orb.speedX + orb.phase));
           const oy =
             h * (orb.y + 0.1 * Math.cos(now * orb.speedY + orb.phase));
-          const grad = ctx!.createRadialGradient(ox, oy, 0, ox, oy, orb.radius);
+          const grad = ctx!.createRadialGradient(
+            ox,
+            oy,
+            0,
+            ox,
+            oy,
+            orb.radius
+          );
           grad.addColorStop(0, orb.color);
           grad.addColorStop(1, "rgba(0,0,0,0)");
           ctx!.fillStyle = grad;
@@ -245,47 +349,76 @@ export default function FluidBackground({
         }
       }
 
-      // --- Ripples ---
-      const alive: Ripple[] = [];
-      for (const ripple of ripplesRef.current) {
-        const elapsed = now - ripple.startTime;
-        if (elapsed > RIPPLE_DURATION) continue;
+      // --- Remote player trails ---
+      for (const [, state] of playersRef.current) {
+        // Lerp toward last known position
+        state.interpX += (state.lastKnownX - state.interpX) * LERP_FACTOR;
+        state.interpY += (state.lastKnownY - state.interpY) * LERP_FACTOR;
 
-        const progress = elapsed / RIPPLE_DURATION;
-
-        if (prefersReducedMotion.current) {
-          // Simple fade, no expansion
-          ctx!.beginPath();
-          ctx!.arc(ripple.x, ripple.y, ripple.maxRadius * 0.5, 0, Math.PI * 2);
-          ctx!.globalAlpha = ripple.opacity * (1 - progress);
-          ctx!.fillStyle = ripple.color;
-          ctx!.fill();
-          ctx!.globalAlpha = 1;
-        } else {
-          const easedProgress = 1 - Math.pow(1 - progress, 3);
-          const currentRadius = ripple.maxRadius * easedProgress;
-          const currentOpacity = ripple.opacity * (1 - progress);
-
-          ctx!.beginPath();
-          ctx!.arc(ripple.x, ripple.y, currentRadius, 0, Math.PI * 2);
-          ctx!.strokeStyle = ripple.color;
-          ctx!.lineWidth = 3;
-          ctx!.globalAlpha = currentOpacity;
-          ctx!.stroke();
-
-          // Inner soft fill
-          ctx!.globalAlpha = currentOpacity * 0.4;
-          ctx!.fillStyle = ripple.color;
-          ctx!.fill();
-          ctx!.globalAlpha = 1;
+        // Add to trail if moved enough
+        const lastPt = state.trail[state.trail.length - 1];
+        if (
+          !lastPt ||
+          Math.hypot(state.interpX - lastPt.x, state.interpY - lastPt.y) > 2
+        ) {
+          state.trail.push({ x: state.interpX, y: state.interpY, time: now, pressed: true });
         }
 
-        alive.push(ripple);
-      }
-      ripplesRef.current = alive;
+        // Age out old points
+        state.trail = state.trail.filter(
+          (p) => now - p.time < TRAIL_MAX_AGE
+        );
+        if (state.trail.length > TRAIL_MAX_POINTS) {
+          state.trail = state.trail.slice(-TRAIL_MAX_POINTS);
+        }
 
-      // FPS guard — reduce orbs if struggling
-      const frameDuration = performance.now() - frameStart;
+        // Draw
+        drawTrail(ctx!, state.trail, state.color, now, REMOTE_TRAIL_OPACITY);
+      }
+
+      // --- Local trail ---
+      localTrailRef.current = localTrailRef.current.filter(
+        (p) => now - p.time < TRAIL_MAX_AGE
+      );
+      if (localTrailRef.current.length > TRAIL_MAX_POINTS) {
+        localTrailRef.current = localTrailRef.current.slice(-TRAIL_MAX_POINTS);
+      }
+      drawTrail(
+        ctx!,
+        localTrailRef.current,
+        playerColorRef.current,
+        now,
+        TRAIL_HEAD_OPACITY
+      );
+
+      // --- Burst particles ---
+      const alive: BurstParticle[] = [];
+      for (const p of burstParticlesRef.current) {
+        p.life -= dt / BURST_LIFETIME;
+        if (p.life <= 0) continue;
+
+        p.vy += BURST_GRAVITY * dt;
+        p.vx *= 1 - 3 * dt; // friction
+        p.vy *= 1 - 3 * dt;
+        p.x += p.vx * dt;
+        p.y += p.vy * dt;
+
+        const radius = p.size * Math.max(p.life, 0);
+        if (radius < 0.3) continue;
+
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        ctx!.globalAlpha = Math.max(p.life, 0) * 0.8;
+        ctx!.fillStyle = p.color;
+        ctx!.fill();
+        ctx!.globalAlpha = 1;
+
+        alive.push(p);
+      }
+      burstParticlesRef.current = alive;
+
+      // --- FPS guard ---
+      const frameDuration = performance.now() - now;
       if (frameDuration > 32) {
         slowFrameCount++;
         if (slowFrameCount > 5 && orbsRef.current.length > 2) {
@@ -304,6 +437,7 @@ export default function FluidBackground({
       cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener("resize", resize);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -313,4 +447,56 @@ export default function FluidBackground({
       style={{ width: "100vw", height: "100vh" }}
     />
   );
+}
+
+// --- Draw helpers ---
+
+const PASSIVE_OPACITY_MUL = 0.45; // multiplier when hovering (not clicked)
+
+function drawTrail(
+  ctx: CanvasRenderingContext2D,
+  trail: TrailPoint[],
+  color: string,
+  now: number,
+  maxOpacity: number
+) {
+  if (trail.length < 2) return;
+
+  // Draw connecting line segments (fading)
+  for (let i = 1; i < trail.length; i++) {
+    const prev = trail[i - 1];
+    const curr = trail[i];
+    const age = now - curr.time;
+    const t = 1 - age / TRAIL_MAX_AGE; // 1 = new, 0 = old
+    if (t < 0.05) continue;
+
+    const pressedMul = curr.pressed ? 1 : PASSIVE_OPACITY_MUL;
+
+    ctx.beginPath();
+    ctx.moveTo(prev.x, prev.y);
+    ctx.lineTo(curr.x, curr.y);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = TRAIL_HEAD_SIZE * 2 * t;
+    ctx.lineCap = "round";
+    ctx.globalAlpha = maxOpacity * t * 0.6 * pressedMul;
+    ctx.stroke();
+  }
+
+  // Draw dots at each point
+  for (let i = 0; i < trail.length; i++) {
+    const point = trail[i];
+    const age = now - point.time;
+    const t = 1 - age / TRAIL_MAX_AGE;
+    if (t < 0.05) continue;
+
+    const pressedMul = point.pressed ? 1 : PASSIVE_OPACITY_MUL;
+    const size = TRAIL_HEAD_SIZE * t;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+    ctx.globalAlpha = maxOpacity * t * pressedMul;
+    ctx.fillStyle = color;
+    ctx.fill();
+  }
+
+  ctx.globalAlpha = 1;
 }

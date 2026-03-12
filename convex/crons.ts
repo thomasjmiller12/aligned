@@ -4,9 +4,9 @@ import { internal } from "./_generated/api";
 const crons = cronJobs();
 
 crons.interval(
-  "cleanup ripples",
+  "cleanup presence",
   { seconds: 30 },
-  internal.ripples.cleanupRipples,
+  internal.presence.cleanupPresence,
 );
 
 export default crons;

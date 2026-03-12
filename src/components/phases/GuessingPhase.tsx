@@ -15,6 +15,8 @@ interface GuessingPhaseProps {
   players: Doc<"players">[];
   myPlayer: Doc<"players"> | null;
   sessionId: string;
+  onDragMove?: (clientX: number, clientY: number) => void;
+  onDragEnd?: () => void;
 }
 
 export default function GuessingPhase({
@@ -23,6 +25,8 @@ export default function GuessingPhase({
   players,
   myPlayer,
   sessionId,
+  onDragMove,
+  onDragEnd,
 }: GuessingPhaseProps) {
   const guesses = useQuery(api.games.getGuesses, { roundId: round._id });
   const submitGuess = useMutation(api.games.submitGuess);
@@ -150,6 +154,8 @@ export default function GuessingPhase({
         onPositionChange={canGuess ? handlePositionChange : undefined}
         playerArrows={playerArrows}
         lockedIn={effectiveLocked}
+        onDragMove={onDragMove}
+        onDragEnd={onDragEnd}
       />
 
       {/* Lock In / Watching */}
