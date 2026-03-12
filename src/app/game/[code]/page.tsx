@@ -40,6 +40,10 @@ export default function GamePage() {
     api.games.getMyPlayer,
     game && sessionId ? { gameId: game._id, sessionId } : "skip"
   );
+  const playerScores = useQuery(
+    api.games.getPlayerScores,
+    game && game.status !== "lobby" ? { gameId: game._id } : "skip"
+  );
 
   const addRipple = useMutation(api.ripples.addRipple);
   const recentRipples = useQuery(
@@ -142,6 +146,8 @@ export default function GamePage() {
           players={players}
           currentRound={currentRound}
           sessionId={sessionId}
+          playerScores={playerScores}
+          showScores={game.status !== "lobby"}
         />
       )}
 
@@ -242,6 +248,7 @@ export default function GamePage() {
                 players={players ?? []}
                 isHost={isHost}
                 sessionId={sessionId}
+                playerScores={playerScores}
               />
             </motion.div>
           )}

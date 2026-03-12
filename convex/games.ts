@@ -610,6 +610,39 @@ export const getGuesses = query({
   },
 });
 
+export const getPlayerScores = query({
+  args: { gameId: v.id("games") },
+  handler: async (ctx, { gameId }) => {
+    const rounds = await ctx.db
+      .query("rounds")
+      .withIndex("by_game", (q) => q.eq("gameId", gameId))
+      .collect();
+
+    // Scoring thresholds — keep in sync with src/lib/scoring.ts SCORE_ZONES
+    const BULLSEYE = 4, CLOSE = 12, NEAR = 20;
+    const scores: Record<string, number> = {};
+
+    for (const round of rounds) {
+      if (round.status !== "revealing" && round.status !== "scored") continue;
+      const guesses = await ctx.db
+        .query("guesses")
+        .withIndex("by_round", (q) => q.eq("roundId", round._id))
+        .collect();
+
+      for (const guess of guesses) {
+        const diff = Math.abs(guess.position - round.targetPosition);
+        let pts = 0;
+        if (diff <= BULLSEYE) pts = 4;
+        else if (diff <= CLOSE) pts = 3;
+        else if (diff <= NEAR) pts = 2;
+        const pid = guess.playerId as string;
+        scores[pid] = (scores[pid] ?? 0) + pts;
+      }
+    }
+    return scores;
+  },
+});
+
 export const getMyPlayer = query({
   args: { gameId: v.id("games"), sessionId: v.string() },
   handler: async (ctx, { gameId, sessionId }) => {

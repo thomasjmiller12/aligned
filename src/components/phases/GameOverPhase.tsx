@@ -13,6 +13,7 @@ interface GameOverPhaseProps {
   players: Doc<"players">[];
   isHost: boolean;
   sessionId: string;
+  playerScores?: Record<string, number> | null;
 }
 
 export default function GameOverPhase({
@@ -20,6 +21,7 @@ export default function GameOverPhase({
   players,
   isHost,
   sessionId,
+  playerScores,
 }: GameOverPhaseProps) {
   const rounds = useQuery(api.games.getRounds, {
     gameId: game._id,
@@ -66,6 +68,49 @@ export default function GameOverPhase({
         </p>
         <p className="mt-2 text-2xl font-semibold">{getVerdict()}</p>
       </motion.div>
+
+      {/* Player Scores */}
+      {playerScores && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="glass-card rounded-2xl p-5 shadow-sm"
+        >
+          <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-secondary">
+            Player Scores
+          </h3>
+          <div className="space-y-2">
+            {[...players]
+              .sort((a, b) => (playerScores[b._id] ?? 0) - (playerScores[a._id] ?? 0))
+              .map((player, i) => {
+                const score = playerScores[player._id] ?? 0;
+                return (
+                  <div
+                    key={player._id}
+                    className="flex items-center gap-3 rounded-lg bg-cream px-3 py-2 text-sm"
+                  >
+                    <span className="font-mono text-xs text-text-secondary">
+                      {i + 1}
+                    </span>
+                    <div
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                      style={{ backgroundColor: player.color }}
+                    >
+                      {player.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="flex-1 text-left font-medium">
+                      {player.name}
+                    </span>
+                    <span className="font-bold tabular-nums" style={{ color: player.color }}>
+                      {score} pts
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        </motion.div>
+      )}
 
       {/* Round Recap */}
       {rounds && (
