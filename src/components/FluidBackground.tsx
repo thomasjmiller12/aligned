@@ -230,16 +230,29 @@ export default function FluidBackground({
   // --- Document-level pointer listeners ---
 
   useEffect(() => {
-    function shouldSkip(e: PointerEvent): boolean {
-      const el = e.target as HTMLElement;
+    function isUIElement(el: Element | null): boolean {
+      if (!el) return false;
       return !!(
-        el.closest("button") ||
-        el.closest("input") ||
-        el.closest("textarea") ||
-        el.closest("svg") ||
-        el.closest("a") ||
-        el.closest("[data-no-ripple]")
+        (el as HTMLElement).closest("button") ||
+        (el as HTMLElement).closest("input") ||
+        (el as HTMLElement).closest("textarea") ||
+        (el as HTMLElement).closest("svg") ||
+        (el as HTMLElement).closest("a") ||
+        (el as HTMLElement).closest("[data-no-ripple]")
       );
+    }
+
+    function shouldSkip(e: PointerEvent): boolean {
+      return isUIElement(e.target as Element);
+    }
+
+    // Prevent browser from hijacking touch gestures on the background.
+    // Without this, mobile browsers cancel pointer events after ~150ms
+    // to start scrolling/panning, which kills the trail mid-drag.
+    function handleTouchMove(e: TouchEvent) {
+      if (!interactiveRef.current) return;
+      if (isUIElement(e.target as Element)) return;
+      e.preventDefault();
     }
 
     function handlePointerDown(e: PointerEvent) {
@@ -271,11 +284,13 @@ export default function FluidBackground({
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointerup", handlePointerUp);
     document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("dragstart", handleDragStart);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("pointerup", handlePointerUp);
       document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("touchmove", handleTouchMove);
       document.removeEventListener("dragstart", handleDragStart);
     };
   }, [addLocalTrailPoint, throttleSendPresence, spawnBurst]);
