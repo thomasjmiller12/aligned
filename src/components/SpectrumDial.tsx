@@ -30,6 +30,8 @@ const SIZE = 340;
 const CENTER_X = SIZE / 2;
 const CENTER_Y = SIZE - 30;
 const RADIUS = SIZE / 2 - 40;
+const VB_Y_OFFSET = 100;
+const VB_HEIGHT = SIZE - 120;
 function degToRad(deg: number): number {
   return ((180 - deg) * Math.PI) / 180;
 }
@@ -166,9 +168,9 @@ export default function SpectrumDial({
       if (!svgRef.current) return null;
       const rect = svgRef.current.getBoundingClientRect();
       const scaleX = rect.width / SIZE;
-      const scaleY = rect.height / (SIZE - 20);
+      const scaleY = rect.height / VB_HEIGHT;
       const x = (clientX - rect.left) / scaleX - CENTER_X;
-      const y = CENTER_Y - (clientY - rect.top) / scaleY;
+      const y = CENTER_Y - ((clientY - rect.top) / scaleY + VB_Y_OFFSET);
       const rawAngle = Math.atan2(y, x) * (180 / Math.PI);
       // Flip: atan2 gives 0°=right, but our dial maps 0°=left
       const angle = 180 - rawAngle;
@@ -183,9 +185,9 @@ export default function SpectrumDial({
       if (!svgRef.current) return null;
       const rect = svgRef.current.getBoundingClientRect();
       const scaleX = rect.width / SIZE;
-      const scaleY = rect.height / (SIZE - 20);
+      const scaleY = rect.height / VB_HEIGHT;
       let x = (clientX - rect.left) / scaleX;
-      let y = (clientY - rect.top) / scaleY;
+      let y = (clientY - rect.top) / scaleY + VB_Y_OFFSET;
 
       // Soft-constrain: allow up to 50% beyond viewBox, then rubber-band
       const margin = SIZE * 0.5;
@@ -195,7 +197,7 @@ export default function SpectrumDial({
         return val;
       };
       x = clampWithRubberBand(x, 0, SIZE);
-      y = clampWithRubberBand(y, 0, SIZE - 20);
+      y = clampWithRubberBand(y, VB_Y_OFFSET, VB_Y_OFFSET + VB_HEIGHT);
 
       return { x, y };
     },
@@ -261,7 +263,7 @@ export default function SpectrumDial({
     <div className="flex flex-col items-center overflow-visible">
       <svg
         ref={svgRef}
-        viewBox={`0 0 ${SIZE} ${SIZE - 20}`}
+        viewBox={`0 ${VB_Y_OFFSET} ${SIZE} ${VB_HEIGHT}`}
         className="w-full max-w-[420px] touch-none select-none"
         style={{ overflow: "visible" }}
         onPointerDown={handlePointerDown}
@@ -537,7 +539,7 @@ export default function SpectrumDial({
       </svg>
 
       {/* Labels */}
-      <div className="-mt-1 flex w-full max-w-[420px] justify-between px-1">
+      <div className="-mt-3 flex w-full max-w-[420px] justify-between px-1">
         <span className="max-w-[40%] text-sm font-semibold text-text-secondary">
           {leftLabel}
         </span>
