@@ -191,7 +191,7 @@ export default function LandingPage() {
         </div>
 
         <p className="mt-8 text-center text-sm text-text-secondary">
-          A collaborative guessing game for 2–8 players
+          A collaborative guessing game for 2–16 players
         </p>
       </motion.div>
     </div>

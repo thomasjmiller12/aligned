@@ -16,6 +16,10 @@ const PLAYER_COLORS = [
   "#14B8A6",
   "#DC2626",
   "#0EA5E9",
+  "#D946EF",
+  "#65A30D",
+  "#0891B2",
+  "#E11D48",
 ];
 
 function generateCode(): string {
@@ -98,7 +102,7 @@ export const joinGame = mutation({
       .withIndex("by_game", (q) => q.eq("gameId", game._id))
       .collect();
 
-    if (players.length >= 12) throw new Error("Game is full (max 12 players)");
+    if (players.length >= 16) throw new Error("Game is full (max 16 players)");
 
     const playerId = await ctx.db.insert("players", {
       gameId: game._id,
