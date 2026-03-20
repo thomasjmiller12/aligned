@@ -22,15 +22,7 @@ html {
 }
 
 body {
-  background: linear-gradient(
-    145deg,
-    #FFF8F0 0%,
-    #FFE8DC 30%,
-    #FFF0E8 50%,
-    #E8F4F2 75%,
-    #FFF8F0 100%
-  );
-  background-attachment: fixed;
+  background: #FFF8F0;
   min-height: 100vh;
   color: var(--color-text);
   font-family: var(--font-sans);

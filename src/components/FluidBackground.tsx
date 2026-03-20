@@ -4,16 +4,6 @@ import { useEffect, useRef, useCallback } from "react";
 
 // --- Types ---
 
-interface Orb {
-  x: number;
-  y: number;
-  radius: number;
-  color: string;
-  phase: number;
-  speedX: number;
-  speedY: number;
-}
-
 interface TrailPoint {
   x: number;
   y: number;
@@ -64,11 +54,103 @@ interface FluidBackgroundProps {
 
 // --- Constants ---
 
-const AMBIENT_COLORS = [
-  "rgba(232, 85, 58, 0.10)", // primary
-  "rgba(42, 157, 143, 0.10)", // accent
-  "rgba(244, 162, 97, 0.08)", // secondary
-  "rgba(124, 58, 237, 0.08)", // purple
+// Lava-lamp blobs — warm oranges, teals, and peach tones
+const LAVA_BLOBS: Array<{
+  color: [number, number, number]; // RGB
+  baseOpacity: number;
+  baseRadius: number;
+  x: number;
+  y: number;
+  // Movement frequencies (radians per second)
+  freqX1: number;
+  freqY1: number;
+  freqX2: number;
+  freqY2: number;
+  // Movement amplitudes (fraction of screen)
+  ampX1: number;
+  ampY1: number;
+  ampX2: number;
+  ampY2: number;
+  // Pulse (breathing) frequency and amplitude
+  pulseFreq: number;
+  pulseAmp: number; // fraction of baseRadius
+  // Opacity drift
+  opacityFreq: number;
+  opacityAmp: number; // fraction of baseOpacity
+  phase: number; // initial phase offset
+}> = [
+  // Large warm orange — slow drifter
+  {
+    color: [232, 85, 58], baseOpacity: 0.28, baseRadius: 420,
+    x: 0.25, y: 0.3,
+    freqX1: 0.08, freqY1: 0.06, freqX2: 0.03, freqY2: 0.05,
+    ampX1: 0.18, ampY1: 0.15, ampX2: 0.1, ampY2: 0.08,
+    pulseFreq: 0.15, pulseAmp: 0.3,
+    opacityFreq: 0.1, opacityAmp: 0.4, phase: 0,
+  },
+  // Large teal — counterpoint
+  {
+    color: [42, 157, 143], baseOpacity: 0.25, baseRadius: 400,
+    x: 0.7, y: 0.6,
+    freqX1: 0.07, freqY1: 0.09, freqX2: 0.04, freqY2: 0.02,
+    ampX1: 0.2, ampY1: 0.18, ampX2: 0.08, ampY2: 0.1,
+    pulseFreq: 0.12, pulseAmp: 0.35,
+    opacityFreq: 0.08, opacityAmp: 0.45, phase: 1.2,
+  },
+  // Medium peach/coral — warm accent
+  {
+    color: [244, 162, 97], baseOpacity: 0.22, baseRadius: 350,
+    x: 0.5, y: 0.2,
+    freqX1: 0.1, freqY1: 0.07, freqX2: 0.05, freqY2: 0.04,
+    ampX1: 0.22, ampY1: 0.18, ampX2: 0.12, ampY2: 0.08,
+    pulseFreq: 0.18, pulseAmp: 0.25,
+    opacityFreq: 0.13, opacityAmp: 0.35, phase: 2.5,
+  },
+  // Small deep orange — fast mover
+  {
+    color: [220, 100, 50], baseOpacity: 0.2, baseRadius: 280,
+    x: 0.15, y: 0.7,
+    freqX1: 0.12, freqY1: 0.1, freqX2: 0.06, freqY2: 0.08,
+    ampX1: 0.25, ampY1: 0.2, ampX2: 0.14, ampY2: 0.1,
+    pulseFreq: 0.2, pulseAmp: 0.4,
+    opacityFreq: 0.15, opacityAmp: 0.5, phase: 3.8,
+  },
+  // Medium teal-green — rises and sinks
+  {
+    color: [30, 140, 130], baseOpacity: 0.2, baseRadius: 330,
+    x: 0.8, y: 0.25,
+    freqX1: 0.06, freqY1: 0.11, freqX2: 0.03, freqY2: 0.07,
+    ampX1: 0.15, ampY1: 0.22, ampX2: 0.1, ampY2: 0.14,
+    pulseFreq: 0.14, pulseAmp: 0.32,
+    opacityFreq: 0.11, opacityAmp: 0.42, phase: 5.0,
+  },
+  // Soft warm glow — large and slow
+  {
+    color: [255, 200, 160], baseOpacity: 0.18, baseRadius: 500,
+    x: 0.4, y: 0.8,
+    freqX1: 0.05, freqY1: 0.04, freqX2: 0.02, freqY2: 0.03,
+    ampX1: 0.18, ampY1: 0.12, ampX2: 0.08, ampY2: 0.06,
+    pulseFreq: 0.08, pulseAmp: 0.25,
+    opacityFreq: 0.06, opacityAmp: 0.35, phase: 0.7,
+  },
+  // Small bright teal — quick drifter
+  {
+    color: [50, 180, 165], baseOpacity: 0.18, baseRadius: 250,
+    x: 0.6, y: 0.45,
+    freqX1: 0.14, freqY1: 0.09, freqX2: 0.07, freqY2: 0.05,
+    ampX1: 0.22, ampY1: 0.18, ampX2: 0.12, ampY2: 0.1,
+    pulseFreq: 0.22, pulseAmp: 0.35,
+    opacityFreq: 0.16, opacityAmp: 0.45, phase: 4.2,
+  },
+  // Deep warm red — background anchor
+  {
+    color: [200, 60, 40], baseOpacity: 0.14, baseRadius: 550,
+    x: 0.35, y: 0.5,
+    freqX1: 0.04, freqY1: 0.03, freqX2: 0.02, freqY2: 0.015,
+    ampX1: 0.12, ampY1: 0.1, ampX2: 0.06, ampY2: 0.05,
+    pulseFreq: 0.06, pulseAmp: 0.2,
+    opacityFreq: 0.05, opacityAmp: 0.3, phase: 1.8,
+  },
 ];
 
 const TRAIL_MAX_POINTS = 15;
@@ -95,8 +177,8 @@ export default function FluidBackground({
   interactive = true,
   getExternalPointerPos,
 }: FluidBackgroundProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const orbsRef = useRef<Orb[]>([]);
+  const canvasRef = useRef<HTMLCanvasElement>(null); // blurred lava layer
+  const fxCanvasRef = useRef<HTMLCanvasElement>(null); // sharp trails/particles layer
   const localTrailRef = useRef<TrailPoint[]>([]);
   const burstParticlesRef = useRef<BurstParticle[]>([]);
   const playersRef = useRef<Map<string, PlayerState>>(new Map());
@@ -172,16 +254,6 @@ export default function FluidBackground({
       prefersReducedMotion.current = e.matches;
     };
     mq.addEventListener("change", handler);
-
-    orbsRef.current = AMBIENT_COLORS.map((color, i) => ({
-      x: 0.2 + i * 0.2,
-      y: 0.3 + (i % 2) * 0.3,
-      radius: 120 + Math.random() * 80,
-      color,
-      phase: (i * Math.PI) / 2,
-      speedX: 0.0002 + Math.random() * 0.0003,
-      speedY: 0.0003 + Math.random() * 0.0002,
-    }));
 
     return () => mq.removeEventListener("change", handler);
   }, []);
@@ -298,16 +370,25 @@ export default function FluidBackground({
   // --- Animation loop ---
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const lavaCanvas = canvasRef.current;
+    const fxCanvas = fxCanvasRef.current;
+    if (!lavaCanvas || !fxCanvas) return;
+    const lavaCtx = lavaCanvas.getContext("2d");
+    const fxCtx = fxCanvas.getContext("2d");
+    if (!lavaCtx || !fxCtx) return;
 
     function resize() {
       const dpr = window.devicePixelRatio || 1;
-      canvas!.width = window.innerWidth * dpr;
-      canvas!.height = window.innerHeight * dpr;
-      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      // Lava layer: render at half res for performance (blur hides detail anyway)
+      lavaCanvas!.width = Math.round(w * dpr * 0.5);
+      lavaCanvas!.height = Math.round(h * dpr * 0.5);
+      lavaCtx!.setTransform(dpr * 0.5, 0, 0, dpr * 0.5, 0, 0);
+      // FX layer: full res
+      fxCanvas!.width = w * dpr;
+      fxCanvas!.height = h * dpr;
+      fxCtx!.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
     resize();
@@ -323,13 +404,13 @@ export default function FluidBackground({
 
       const w = window.innerWidth;
       const h = window.innerHeight;
-      ctx!.clearRect(0, 0, w, h);
+      lavaCtx!.clearRect(0, 0, w, h);
+      fxCtx!.clearRect(0, 0, w, h);
 
       // --- External pointer (dial drag) ---
       const extPos = getExternalPointerPosRef.current?.();
       if (extPos) {
         addLocalTrailPoint(extPos.x, extPos.y);
-        // Throttle presence sends for external pointer too
         const sendNow = performance.now();
         if (sendNow - lastSendTime.current >= PRESENCE_SEND_INTERVAL) {
           lastSendTime.current = sendNow;
@@ -337,40 +418,51 @@ export default function FluidBackground({
         }
       }
 
-      // --- Ambient orbs ---
+      // --- Lava-lamp blobs (drawn to blurred canvas) ---
       if (!prefersReducedMotion.current) {
-        for (const orb of orbsRef.current) {
-          const ox =
-            w * (orb.x + 0.15 * Math.sin(now * orb.speedX + orb.phase));
-          const oy =
-            h * (orb.y + 0.1 * Math.cos(now * orb.speedY + orb.phase));
-          const grad = ctx!.createRadialGradient(
-            ox,
-            oy,
-            0,
-            ox,
-            oy,
-            orb.radius
+        const t = now * 0.001;
+
+        for (const blob of LAVA_BLOBS) {
+          const ox = w * (
+            blob.x
+            + blob.ampX1 * Math.sin(t * blob.freqX1 + blob.phase)
+            + blob.ampX2 * Math.sin(t * blob.freqX2 + blob.phase * 1.7)
           );
-          grad.addColorStop(0, orb.color);
+          const oy = h * (
+            blob.y
+            + blob.ampY1 * Math.cos(t * blob.freqY1 + blob.phase)
+            + blob.ampY2 * Math.cos(t * blob.freqY2 + blob.phase * 2.3)
+          );
+
+          const radius = blob.baseRadius * (
+            1 + blob.pulseAmp * Math.sin(t * blob.pulseFreq + blob.phase * 0.9)
+          );
+
+          const opacity = blob.baseOpacity * (
+            1 + blob.opacityAmp * Math.sin(t * blob.opacityFreq + blob.phase * 1.3)
+          );
+
+          const [r, g, b] = blob.color;
+          const grad = lavaCtx!.createRadialGradient(ox, oy, 0, ox, oy, radius);
+          grad.addColorStop(0, `rgba(${r}, ${g}, ${b}, ${opacity})`);
+          grad.addColorStop(0.4, `rgba(${r}, ${g}, ${b}, ${opacity * 0.6})`);
+          grad.addColorStop(0.7, `rgba(${r}, ${g}, ${b}, ${opacity * 0.25})`);
           grad.addColorStop(1, "rgba(0,0,0,0)");
-          ctx!.fillStyle = grad;
-          ctx!.fillRect(
-            ox - orb.radius,
-            oy - orb.radius,
-            orb.radius * 2,
-            orb.radius * 2
+          lavaCtx!.fillStyle = grad;
+          lavaCtx!.fillRect(
+            ox - radius,
+            oy - radius,
+            radius * 2,
+            radius * 2
           );
         }
       }
 
-      // --- Remote player trails ---
+      // --- Remote player trails (drawn to sharp FX canvas) ---
       for (const [, state] of playersRef.current) {
-        // Lerp toward last known position
         state.interpX += (state.lastKnownX - state.interpX) * LERP_FACTOR;
         state.interpY += (state.lastKnownY - state.interpY) * LERP_FACTOR;
 
-        // Add to trail if moved enough
         const lastPt = state.trail[state.trail.length - 1];
         if (
           !lastPt ||
@@ -379,7 +471,6 @@ export default function FluidBackground({
           state.trail.push({ x: state.interpX, y: state.interpY, time: now, pressed: true });
         }
 
-        // Age out old points
         state.trail = state.trail.filter(
           (p) => now - p.time < TRAIL_MAX_AGE
         );
@@ -387,11 +478,10 @@ export default function FluidBackground({
           state.trail = state.trail.slice(-TRAIL_MAX_POINTS);
         }
 
-        // Draw
-        drawTrail(ctx!, state.trail, state.color, now, REMOTE_TRAIL_OPACITY);
+        drawTrail(fxCtx!, state.trail, state.color, now, REMOTE_TRAIL_OPACITY);
       }
 
-      // --- Local trail ---
+      // --- Local trail (drawn to sharp FX canvas) ---
       localTrailRef.current = localTrailRef.current.filter(
         (p) => now - p.time < TRAIL_MAX_AGE
       );
@@ -399,21 +489,21 @@ export default function FluidBackground({
         localTrailRef.current = localTrailRef.current.slice(-TRAIL_MAX_POINTS);
       }
       drawTrail(
-        ctx!,
+        fxCtx!,
         localTrailRef.current,
         playerColorRef.current,
         now,
         TRAIL_HEAD_OPACITY
       );
 
-      // --- Burst particles ---
+      // --- Burst particles (drawn to sharp FX canvas) ---
       const alive: BurstParticle[] = [];
       for (const p of burstParticlesRef.current) {
         p.life -= dt / BURST_LIFETIME;
         if (p.life <= 0) continue;
 
         p.vy += BURST_GRAVITY * dt;
-        p.vx *= 1 - 3 * dt; // friction
+        p.vx *= 1 - 3 * dt;
         p.vy *= 1 - 3 * dt;
         p.x += p.vx * dt;
         p.y += p.vy * dt;
@@ -421,12 +511,12 @@ export default function FluidBackground({
         const radius = p.size * Math.max(p.life, 0);
         if (radius < 0.3) continue;
 
-        ctx!.beginPath();
-        ctx!.arc(p.x, p.y, radius, 0, Math.PI * 2);
-        ctx!.globalAlpha = Math.max(p.life, 0) * 0.8;
-        ctx!.fillStyle = p.color;
-        ctx!.fill();
-        ctx!.globalAlpha = 1;
+        fxCtx!.beginPath();
+        fxCtx!.arc(p.x, p.y, radius, 0, Math.PI * 2);
+        fxCtx!.globalAlpha = Math.max(p.life, 0) * 0.8;
+        fxCtx!.fillStyle = p.color;
+        fxCtx!.fill();
+        fxCtx!.globalAlpha = 1;
 
         alive.push(p);
       }
@@ -436,9 +526,6 @@ export default function FluidBackground({
       const frameDuration = performance.now() - now;
       if (frameDuration > 32) {
         slowFrameCount++;
-        if (slowFrameCount > 5 && orbsRef.current.length > 2) {
-          orbsRef.current = orbsRef.current.slice(0, 2);
-        }
       } else {
         slowFrameCount = Math.max(0, slowFrameCount - 1);
       }
@@ -456,11 +543,20 @@ export default function FluidBackground({
   }, []);
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-0"
-      style={{ width: "100vw", height: "100vh" }}
-    />
+    <>
+      {/* Lava-lamp layer: blurred for diffused glow */}
+      <canvas
+        ref={canvasRef}
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{ width: "100vw", height: "100vh", filter: "blur(80px)" }}
+      />
+      {/* FX layer: sharp trails and particles */}
+      <canvas
+        ref={fxCanvasRef}
+        className="pointer-events-none fixed inset-0 z-0"
+        style={{ width: "100vw", height: "100vh" }}
+      />
+    </>
   );
 }
 
