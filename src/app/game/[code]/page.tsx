@@ -6,6 +6,7 @@ import { api } from "../../../../convex/_generated/api";
 import { getSessionId } from "@/lib/session";
 import { Id } from "../../../../convex/_generated/dataModel";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { playPhaseTransition } from "@/lib/sounds";
 import GameHeader from "@/components/GameHeader";
 import PlayerBar from "@/components/PlayerBar";
 import LobbyPhase from "@/components/phases/LobbyPhase";
@@ -70,7 +71,7 @@ export default function GamePage() {
   );
 
   const handleLocalBurst = useCallback(
-    (x: number, y: number) => {
+    (x: number, y: number, burstSeed: number) => {
       if (!game || !myPlayer) return;
       updatePresence({
         gameId: game._id,
@@ -79,6 +80,7 @@ export default function GamePage() {
         y,
         color: myPlayer.color,
         burst: true,
+        burstSeed,
       });
     },
     [game, myPlayer, updatePresence]
@@ -95,6 +97,16 @@ export default function GamePage() {
     dialDragPosRef.current = null;
   }, []);
 
+  // Play sound on phase transitions
+  const prevStatusRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (!game) return;
+    if (prevStatusRef.current && prevStatusRef.current !== game.status) {
+      playPhaseTransition();
+    }
+    prevStatusRef.current = game.status;
+  }, [game?.status]);
+
   const remotePresence = (presenceData ?? [])
     .filter((r) => myPlayer && r.playerId !== myPlayer._id)
     .map((r) => ({
@@ -103,6 +115,7 @@ export default function GamePage() {
       y: r.y,
       color: r.color,
       burstAt: r.burstAt,
+      burstSeed: r.burstSeed,
     }));
 
   if (game === undefined || players === undefined) {

@@ -10,8 +10,9 @@ export const updatePresence = mutation({
     y: v.number(),
     color: v.string(),
     burst: v.optional(v.boolean()),
+    burstSeed: v.optional(v.number()),
   },
-  handler: async (ctx, { gameId, playerId, x, y, color, burst }) => {
+  handler: async (ctx, { gameId, playerId, x, y, color, burst, burstSeed }) => {
     const existing = await ctx.db
       .query("presence")
       .withIndex("by_game_player", (q) =>
@@ -27,7 +28,7 @@ export const updatePresence = mutation({
         y,
         color,
         updatedAt: now,
-        ...(burst ? { burstAt: now } : {}),
+        ...(burst ? { burstAt: now, burstSeed: burstSeed ?? now } : {}),
       });
     } else {
       await ctx.db.insert("presence", {
@@ -37,7 +38,7 @@ export const updatePresence = mutation({
         y,
         color,
         updatedAt: now,
-        ...(burst ? { burstAt: now } : {}),
+        ...(burst ? { burstAt: now, burstSeed: burstSeed ?? now } : {}),
       });
     }
   },

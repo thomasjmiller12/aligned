@@ -59,11 +59,21 @@ function registerVariant(id: TadpoleVariantId, def: TadpoleVariantDef) {
   VARIANTS[id] = def;
 }
 
-/** Pick a variant ID using weighted random selection. */
-function rollVariant(): TadpoleVariantId {
+/** Simple seeded PRNG (mulberry32). Returns 0-1. */
+function seededRandom(seed: number): number {
+  let t = (seed + 0x6d2b79f5) | 0;
+  t = Math.imul(t ^ (t >>> 15), t | 1);
+  t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+}
+
+/** Pick a variant ID using weighted random selection.
+ *  If a seed is provided, uses deterministic selection so all clients agree. */
+function rollVariant(seed?: number): TadpoleVariantId {
   const entries = Object.entries(VARIANTS);
   const totalWeight = entries.reduce((sum, [, v]) => sum + v.weight, 0);
-  let roll = Math.random() * totalWeight;
+  const rand = seed != null ? seededRandom(seed) : Math.random();
+  let roll = rand * totalWeight;
   for (const [id, v] of entries) {
     roll -= v.weight;
     if (roll <= 0) return id;
@@ -91,9 +101,10 @@ interface FluidBackgroundProps {
     y: number;
     color: string;
     burstAt?: number;
+    burstSeed?: number;
   }>;
   onLocalMove?: (x: number, y: number) => void;
-  onLocalBurst?: (x: number, y: number) => void;
+  onLocalBurst?: (x: number, y: number, burstSeed: number) => void;
   playerColor?: string;
   interactive?: boolean;
   getExternalPointerPos?: () => { x: number; y: number } | null;
@@ -256,7 +267,8 @@ function gaussianRandom(mean: number, stddev: number): number {
 function spawnTadpole(
   cursorX: number,
   cursorY: number,
-  color: string
+  color: string,
+  variantSeed?: number
 ): Tadpole | null {
   if (totalAlive >= MAX_TADPOLES_TOTAL) return null;
 
@@ -283,7 +295,7 @@ function spawnTadpole(
   t.alive = true;
   t.wigglePhase = Math.random() * Math.PI * 2;
   t.wiggleFreq = 4 + Math.random() * 2;
-  t.variant = rollVariant();
+  t.variant = rollVariant(variantSeed);
   const variantDef = VARIANTS[t.variant];
   t.maxSpeed = (54 + Math.random() * 34) * (variantDef?.speedMul ?? 1);
   const baseSize = Math.max(1.5, Math.min(3.5, gaussianRandom(2.5, 0.4)));
@@ -806,7 +818,7 @@ export default function FluidBackground({
     onLocalMoveRef.current?.(x / window.innerWidth, y / window.innerHeight);
   }, []);
 
-  const handleTap = useCallback((x: number, y: number) => {
+  const handleTap = useCallback((x: number, y: number): number => {
     const maxLocal = prefersReducedMotion.current ? 1 : MAX_TADPOLES_LOCAL;
     // Clean dead refs first
     localTadpolesRef.current = localTadpolesRef.current.filter((tp) => tp.alive);
@@ -829,10 +841,13 @@ export default function FluidBackground({
       }
     }
 
-    const t = spawnTadpole(x, y, playerColorRef.current);
+    // Generate a seed so all clients pick the same variant for this burst
+    const burstSeed = Math.floor(Math.random() * 2147483647);
+    const t = spawnTadpole(x, y, playerColorRef.current, burstSeed);
     if (t) {
       localTadpolesRef.current.push(t);
     }
+    return burstSeed;
   }, []);
 
   // --- Reduced motion ---
@@ -897,7 +912,7 @@ export default function FluidBackground({
             state.tadpoles.splice(oldestIdx, 1);
           }
         }
-        const t = spawnTadpole(rp.x * w, rp.y * h, rp.color);
+        const t = spawnTadpole(rp.x * w, rp.y * h, rp.color, rp.burstSeed);
         if (t) state.tadpoles.push(t);
       }
     }
@@ -941,10 +956,11 @@ export default function FluidBackground({
     function handlePointerDown(e: PointerEvent) {
       if (!interactiveRef.current || shouldSkip(e)) return;
       updateLocalCursor(e.clientX, e.clientY);
-      handleTap(e.clientX, e.clientY);
+      const burstSeed = handleTap(e.clientX, e.clientY);
       onLocalBurstRef.current?.(
         e.clientX / window.innerWidth,
-        e.clientY / window.innerHeight
+        e.clientY / window.innerHeight,
+        burstSeed
       );
       throttleSendPresence(e.clientX, e.clientY);
     }

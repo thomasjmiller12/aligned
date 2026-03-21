@@ -70,6 +70,7 @@ export default defineSchema({
     color: v.string(),     // player's hex color
     updatedAt: v.number(), // Date.now() timestamp
     burstAt: v.optional(v.number()), // timestamp of last burst event
+    burstSeed: v.optional(v.number()), // RNG seed for deterministic variant selection
   })
     .index("by_game", ["gameId"])
     .index("by_game_player", ["gameId", "playerId"]),
