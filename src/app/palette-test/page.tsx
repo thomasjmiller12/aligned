@@ -17,36 +17,27 @@ function posOnArc(deg: number, r: number): { x: number; y: number } {
   };
 }
 
+interface BgGradient {
+  from: string;
+  to: string;
+  id: string;
+}
+
 interface PaletteOption {
   name: string;
   description: string;
-  arcGradient: [string, string, string];
+  bgGradient: BgGradient;
+  arcColor: string;
   zones: { label: string; color: string; from: number; to: number }[];
   scoreColors: { pts: number; color: string }[];
 }
 
 const palettes: PaletteOption[] = [
   {
-    name: "Current",
-    description: "Yellow / Blue / Gray — the blue feels disconnected from the warm arc",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
-    zones: [
-      { label: "4pt", color: "#FFD639", from: -4, to: 4 },
-      { label: "3pt", color: "#007CBE", from: -12, to: -4 },
-      { label: "3pt", color: "#007CBE", from: 4, to: 12 },
-      { label: "2pt", color: "#9CA3AF", from: -20, to: -12 },
-      { label: "2pt", color: "#9CA3AF", from: 12, to: 20 },
-    ],
-    scoreColors: [
-      { pts: 4, color: "#FFD700" },
-      { pts: 3, color: "#FF9800" },
-      { pts: 2, color: "#FF7043" },
-    ],
-  },
-  {
-    name: "A: Warm Harmony",
-    description: "Gold → Amber → Peach — all warm tones that flow naturally from the arc",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
+    name: "A: Slate Blue",
+    description: "Cool slate blue wash — clean, minimal, scoring zones pop against the neutral base",
+    bgGradient: { from: "#E8EEF4", to: "#C5D3E0", id: "slate" },
+    arcColor: "#94A3B8",
     zones: [
       { label: "4pt", color: "#FBBF24", from: -4, to: 4 },
       { label: "3pt", color: "#F97316", from: -12, to: -4 },
@@ -61,9 +52,10 @@ const palettes: PaletteOption[] = [
     ],
   },
   {
-    name: "B: Teal Cascade",
-    description: "Gold center → Teal gradient — ties the scoring to the arc's teal endpoint",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
+    name: "B: Warm Cream",
+    description: "Very light warm wash — keeps the cozy feel, scoring zones in teal tones",
+    bgGradient: { from: "#FFF8F0", to: "#F5E6D3", id: "cream" },
+    arcColor: "#D4C4B0",
     zones: [
       { label: "4pt", color: "#FBBF24", from: -4, to: 4 },
       { label: "3pt", color: "#2DD4BF", from: -12, to: -4 },
@@ -78,9 +70,10 @@ const palettes: PaletteOption[] = [
     ],
   },
   {
-    name: "C: Sunset Fade",
-    description: "Hot pink center → Coral → Sand — vibrant gradient that pops on the warm background",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
+    name: "C: Cool Lavender",
+    description: "Soft lavender gradient — elegant feel, warm scoring colors contrast nicely",
+    bgGradient: { from: "#F0ECF8", to: "#D8CEE8", id: "lavender" },
+    arcColor: "#B8A9D0",
     zones: [
       { label: "4pt", color: "#FB7185", from: -4, to: 4 },
       { label: "3pt", color: "#FDBA74", from: -12, to: -4 },
@@ -95,43 +88,46 @@ const palettes: PaletteOption[] = [
     ],
   },
   {
-    name: "D: Earth & Gold",
-    description: "Rich gold → Warm brown → Light tan — grounded, organic feel with high contrast center",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
+    name: "D: Ocean Blue",
+    description: "Light-to-medium blue gradient — classic gauge look, gold/amber scoring zones",
+    bgGradient: { from: "#EBF4FF", to: "#BFDBFE", id: "ocean" },
+    arcColor: "#93B4D4",
     zones: [
       { label: "4pt", color: "#F59E0B", from: -4, to: 4 },
       { label: "3pt", color: "#D97706", from: -12, to: -4 },
       { label: "3pt", color: "#D97706", from: 4, to: 12 },
-      { label: "2pt", color: "#E5D5B0", from: -20, to: -12 },
-      { label: "2pt", color: "#E5D5B0", from: 12, to: 20 },
+      { label: "2pt", color: "#FDE68A", from: -20, to: -12 },
+      { label: "2pt", color: "#FDE68A", from: 12, to: 20 },
     ],
     scoreColors: [
       { pts: 4, color: "#F59E0B" },
       { pts: 3, color: "#D97706" },
-      { pts: 2, color: "#E5D5B0" },
+      { pts: 2, color: "#FDE68A" },
     ],
   },
   {
-    name: "E: Warm-Cool Bridge",
-    description: "Gold center → Primary red → Accent teal — uses the app's own design tokens as scoring colors",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
+    name: "E: Sage Green",
+    description: "Soft sage wash — natural, calming; warm coral/gold scoring pops against green",
+    bgGradient: { from: "#ECFDF5", to: "#BBF7D0", id: "sage" },
+    arcColor: "#86CEAB",
     zones: [
-      { label: "4pt", color: "#FBBF24", from: -4, to: 4 },
-      { label: "3pt", color: "#E8553A", from: -12, to: -4 },
-      { label: "3pt", color: "#E8553A", from: 4, to: 12 },
-      { label: "2pt", color: "#5EEAD4", from: -20, to: -12 },
-      { label: "2pt", color: "#5EEAD4", from: 12, to: 20 },
+      { label: "4pt", color: "#FB7185", from: -4, to: 4 },
+      { label: "3pt", color: "#F97316", from: -12, to: -4 },
+      { label: "3pt", color: "#F97316", from: 4, to: 12 },
+      { label: "2pt", color: "#FBBF24", from: -20, to: -12 },
+      { label: "2pt", color: "#FBBF24", from: 12, to: 20 },
     ],
     scoreColors: [
-      { pts: 4, color: "#FBBF24" },
-      { pts: 3, color: "#E8553A" },
-      { pts: 2, color: "#5EEAD4" },
+      { pts: 4, color: "#FB7185" },
+      { pts: 3, color: "#F97316" },
+      { pts: 2, color: "#FBBF24" },
     ],
   },
   {
-    name: "F: Jewel Tones",
-    description: "Emerald → Sapphire → Amethyst — rich, bold scoring zones that contrast clearly",
-    arcGradient: ["#F4A261", "#E8553A", "#2A9D8F"],
+    name: "F: Steel Gray",
+    description: "Neutral steel gradient — industrial gauge look, jewel-tone scoring zones stand out",
+    bgGradient: { from: "#F3F4F6", to: "#D1D5DB", id: "steel" },
+    arcColor: "#9CA3AF",
     zones: [
       { label: "4pt", color: "#34D399", from: -4, to: 4 },
       { label: "3pt", color: "#60A5FA", from: -12, to: -4 },
@@ -143,6 +139,42 @@ const palettes: PaletteOption[] = [
       { pts: 4, color: "#34D399" },
       { pts: 3, color: "#60A5FA" },
       { pts: 2, color: "#C084FC" },
+    ],
+  },
+  {
+    name: "G: Blush Pink",
+    description: "Soft pink wash — playful, party game vibe; teal/gold scoring for contrast",
+    bgGradient: { from: "#FFF1F2", to: "#FECDD3", id: "blush" },
+    arcColor: "#E0A8AF",
+    zones: [
+      { label: "4pt", color: "#FBBF24", from: -4, to: 4 },
+      { label: "3pt", color: "#2DD4BF", from: -12, to: -4 },
+      { label: "3pt", color: "#2DD4BF", from: 4, to: 12 },
+      { label: "2pt", color: "#93C5FD", from: -20, to: -12 },
+      { label: "2pt", color: "#93C5FD", from: 12, to: 20 },
+    ],
+    scoreColors: [
+      { pts: 4, color: "#FBBF24" },
+      { pts: 3, color: "#2DD4BF" },
+      { pts: 2, color: "#93C5FD" },
+    ],
+  },
+  {
+    name: "H: Warm Blue",
+    description: "Light blue to deeper blue — your original idea; gold-to-amber warm scoring",
+    bgGradient: { from: "#EFF6FF", to: "#93C5FD", id: "warmblue" },
+    arcColor: "#7BA8CC",
+    zones: [
+      { label: "4pt", color: "#FBBF24", from: -4, to: 4 },
+      { label: "3pt", color: "#F97316", from: -12, to: -4 },
+      { label: "3pt", color: "#F97316", from: 4, to: 12 },
+      { label: "2pt", color: "#FDBA74", from: -20, to: -12 },
+      { label: "2pt", color: "#FDBA74", from: 12, to: 20 },
+    ],
+    scoreColors: [
+      { pts: 4, color: "#FBBF24" },
+      { pts: 3, color: "#F97316" },
+      { pts: 2, color: "#FDBA74" },
     ],
   },
 ];
@@ -184,17 +216,21 @@ function DialPreview({ palette, targetDeg }: { palette: PaletteOption; targetDeg
     return 0;
   }
 
+  const gradId = `bg-${palette.bgGradient.id}`;
+
   return (
     <svg viewBox={`0 0 ${SIZE} ${SIZE - 10}`} className="w-full" style={{ overflow: "visible" }}>
       <defs>
-        <linearGradient id={`ag-${palette.name}`} x1="0" y1="0" x2="1" y2="0">
-          <stop offset="0%" stopColor={palette.arcGradient[0]} />
-          <stop offset="50%" stopColor={palette.arcGradient[1]} />
-          <stop offset="100%" stopColor={palette.arcGradient[2]} />
-        </linearGradient>
+        {/* Radial gradient fill for the semicircle area — light at top, deeper at base */}
+        <radialGradient id={gradId} cx="50%" cy="100%" r="80%" fx="50%" fy="100%">
+          <stop offset="0%" stopColor={palette.bgGradient.to} stopOpacity={0.4} />
+          <stop offset="60%" stopColor={palette.bgGradient.from} stopOpacity={0.25} />
+          <stop offset="100%" stopColor={palette.bgGradient.from} stopOpacity={0.08} />
+        </radialGradient>
       </defs>
 
-      <path d={bgArcPath} fill="#FFF8F0" opacity={0.5} />
+      {/* Subtle gradient fill across entire semicircle */}
+      <path d={bgArcPath} fill={`url(#${gradId})`} />
 
       {/* Tick marks */}
       {Array.from({ length: 37 }).map((_, i) => {
@@ -215,8 +251,15 @@ function DialPreview({ palette, targetDeg }: { palette: PaletteOption; targetDeg
         );
       })}
 
-      {/* Arc */}
-      <path d={arcPath} fill="none" stroke={`url(#ag-${palette.name})`} strokeWidth={8} strokeLinecap="round" />
+      {/* Neutral arc line — no color gradient, just a clean gauge border */}
+      <path
+        d={arcPath}
+        fill="none"
+        stroke={palette.arcColor}
+        strokeWidth={8}
+        strokeLinecap="round"
+        opacity={0.5}
+      />
 
       {/* Scoring zones */}
       {palette.zones.map((z, i) => {
@@ -280,9 +323,9 @@ export default function PaletteTest() {
   return (
     <div className="min-h-screen bg-[#FFF8F0] p-6">
       <div className="mx-auto max-w-6xl">
-        <h1 className="mb-2 text-2xl font-bold text-[#2D2D2D]">Spectrum Dial — Scoring Zone Palette Explorer</h1>
+        <h1 className="mb-2 text-2xl font-bold text-[#2D2D2D]">Spectrum Dial — Neutral Dial + Scoring Zones</h1>
         <p className="mb-8 text-sm text-[#666]">
-          Comparing scoring zone color palettes. Target at 90° with 4 simulated player guesses.
+          Neutral arc with subtle gradient fill across the semicircle. Scoring zones are the star.
         </p>
 
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -296,7 +339,14 @@ export default function PaletteTest() {
               <DialPreview palette={palette} targetDeg={targetDeg} />
 
               {/* Color swatches */}
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-3">
+                <div className="flex items-center gap-1">
+                  <div
+                    className="h-4 w-8 rounded-sm border border-black/10"
+                    style={{ background: `linear-gradient(to right, ${palette.bgGradient.from}, ${palette.bgGradient.to})` }}
+                  />
+                  <span className="text-[10px] text-[#888]">fill</span>
+                </div>
                 {palette.zones
                   .filter((z, i, arr) => arr.findIndex((a) => a.color === z.color) === i)
                   .map((z, i) => (
