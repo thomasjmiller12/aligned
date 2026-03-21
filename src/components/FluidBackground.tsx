@@ -27,6 +27,7 @@ interface Tadpole {
   variant: TadpoleVariantId;
   arrival: number; // 0 = seeking cursor, 1 = schooling near cursor (continuous blend)
   nextKickTime: number; // age at which next random velocity kick fires (schooling mode)
+  kickUntil: number; // age until which the current kick is "active" (suppresses spring)
 }
 
 // --- Variant System ---
@@ -240,6 +241,7 @@ function createTadpole(): Tadpole {
     variant: "normal" as TadpoleVariantId,
     arrival: 0,
     nextKickTime: 0,
+    kickUntil: 0,
   };
 }
 
@@ -357,9 +359,11 @@ function updateTadpole(
     }
 
     // === Schooling force (lazy drift near cursor) ===
-    // Spring pulls them back; periodic random kicks send them exploring.
-    const schoolFx = dx * 0.5;
-    const schoolFy = dy * 0.5;
+    // Spring pulls them back; suppress spring during kicks so they coast further.
+    const kicking = t.age < t.kickUntil;
+    const springStrength = kicking ? 0.1 : 0.5;
+    const schoolFx = dx * springStrength;
+    const schoolFy = dy * springStrength;
 
     // Blend based on arrival
     seekFx = activeFx * (1 - a) + schoolFx * a;
@@ -367,14 +371,15 @@ function updateTadpole(
   }
 
   // --- Random velocity kicks when schooling ---
-  // Instead of constant wander, periodic bursts give them exploratory character.
+  // Periodic bursts with suppressed spring let them coast and explore.
   let kickFx = 0, kickFy = 0;
   if (a > 0.5 && t.age >= t.nextKickTime && !reducedMotion) {
     const kickAngle = Math.random() * Math.PI * 2;
-    const kickStrength = 12 + Math.random() * 18; // 12-30 px/s impulse
+    const kickStrength = 18 + Math.random() * 22; // 18-40 px/s impulse
     kickFx = Math.cos(kickAngle) * kickStrength;
     kickFy = Math.sin(kickAngle) * kickStrength;
-    t.nextKickTime = t.age + 1.0 + Math.random() * 2.5; // next kick in 1-3.5s
+    t.kickUntil = t.age + 0.4 + Math.random() * 0.4; // coast for 0.4-0.8s
+    t.nextKickTime = t.age + 1.5 + Math.random() * 2.5; // next kick in 1.5-4s
   }
 
   // Wander (light background drift, reduced when schooling since kicks handle it)
