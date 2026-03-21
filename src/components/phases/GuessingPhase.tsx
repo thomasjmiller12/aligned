@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Timer from "../Timer";
 import SpectrumDial from "../SpectrumDial";
 import { Lock, Eye } from "lucide-react";
+import { playLockIn } from "@/lib/sounds";
 
 
 interface GuessingPhaseProps {
@@ -85,6 +86,7 @@ export default function GuessingPhase({
     try {
       await lockGuessMutation({ roundId: round._id, sessionId });
       setIsLocked(true);
+      playLockIn();
     } finally {
       setLockPending(false);
     }

@@ -7,7 +7,8 @@ import SpectrumDial from "../SpectrumDial";
 import { calculateScore, getScoreLabel, getScoreColor } from "@/lib/scoring";
 import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { playScoreReveal } from "@/lib/sounds";
 
 interface RevealPhaseProps {
   game: Doc<"games">;
@@ -55,6 +56,16 @@ export default function RevealPhase({
   });
 
   const roundTotal = scoreBreakdown.reduce((sum, s) => sum + s.score, 0);
+
+  // Play score sound once on reveal, synced with scoring wedge animation
+  const soundPlayedRef = useRef(false);
+  useEffect(() => {
+    if (soundPlayedRef.current || scoreBreakdown.length === 0) return;
+    soundPlayedRef.current = true;
+    const bestScore = Math.max(...scoreBreakdown.map((s) => s.score));
+    const timer = setTimeout(() => playScoreReveal(bestScore), 500);
+    return () => clearTimeout(timer);
+  }, [scoreBreakdown]);
 
   return (
     <div className="space-y-2 text-center">

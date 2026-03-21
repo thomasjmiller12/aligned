@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { SCORE_ZONES } from "@/lib/scoring";
+import { playDialDragStart, playDialTick, playDialLand } from "@/lib/sounds";
 
 interface PlayerArrow {
   id: string;
@@ -154,6 +155,7 @@ export default function SpectrumDial({
   onDragEnd,
 }: SpectrumDialProps) {
   const svgRef = useRef<SVGSVGElement>(null);
+  const lastTickAngleRef = useRef<number | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   // Raw pointer position in SVG-space during drag (null when not dragging)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -211,6 +213,8 @@ export default function SpectrumDial({
       (e.target as Element).setPointerCapture?.(e.pointerId);
       setIsDragging(true);
       if (navigator.vibrate) navigator.vibrate(10);
+      playDialDragStart();
+      lastTickAngleRef.current = null;
       const svgPos = clientToSvg(e.clientX, e.clientY);
       if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
@@ -226,7 +230,13 @@ export default function SpectrumDial({
       const svgPos = clientToSvg(e.clientX, e.clientY);
       if (svgPos) setDragPos(svgPos);
       const angle = getAngleFromEvent(e.clientX, e.clientY);
-      if (angle !== null) onPositionChange?.(angle);
+      if (angle !== null) {
+        if (lastTickAngleRef.current === null || Math.abs(angle - lastTickAngleRef.current) >= 10) {
+          playDialTick();
+          lastTickAngleRef.current = angle;
+        }
+        onPositionChange?.(angle);
+      }
       onDragMove?.(e.clientX, e.clientY);
     },
     [isDragging, interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange, onDragMove]
@@ -243,6 +253,7 @@ export default function SpectrumDial({
         setJustLanded(true);
         setTimeout(() => setJustLanded(false), 400);
         if (navigator.vibrate) navigator.vibrate([15, 30, 10]);
+        playDialLand();
       }
     }
     setIsDragging(false);

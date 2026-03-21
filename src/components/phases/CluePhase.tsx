@@ -8,6 +8,7 @@ import Timer from "../Timer";
 import SpectrumDial from "../SpectrumDial";
 import { motion } from "framer-motion";
 import { Check, Clock } from "lucide-react";
+import { playClueSubmitted } from "@/lib/sounds";
 
 interface CluePhaseProps {
   game: Doc<"games">;
@@ -50,6 +51,7 @@ export default function CluePhase({
         clue: clueText.trim(),
       });
       setSubmitted(true);
+      playClueSubmitted();
     } catch {
       setSubmitting(false);
     }

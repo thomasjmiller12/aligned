@@ -7,6 +7,8 @@ import { motion } from "framer-motion";
 import { Trophy, RotateCcw, Home } from "lucide-react";
 import Link from "next/link";
 import Confetti from "../Confetti";
+import { useEffect, useRef } from "react";
+import { playGameOver } from "@/lib/sounds";
 
 interface GameOverPhaseProps {
   game: Doc<"games">;
@@ -28,6 +30,15 @@ export default function GameOverPhase({
     sessionId,
   });
   const playAgain = useMutation(api.games.playAgain);
+
+  // Play game over fanfare once
+  const soundPlayedRef = useRef(false);
+  useEffect(() => {
+    if (soundPlayedRef.current) return;
+    soundPlayedRef.current = true;
+    const timer = setTimeout(() => playGameOver(), 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const maxPossible = (players.length - 1) * 4 * players.length;
   const percentage =

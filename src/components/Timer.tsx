@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { playTimerWarning } from "@/lib/sounds";
 
 interface TimerProps {
   endsAt: number | undefined;
@@ -10,6 +11,15 @@ interface TimerProps {
 
 export default function Timer({ endsAt, totalSeconds }: TimerProps) {
   const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
+  const prevSecondsRef = useRef(totalSeconds);
+
+  // Play warning sounds at threshold crossings
+  useEffect(() => {
+    const prev = prevSecondsRef.current;
+    prevSecondsRef.current = secondsLeft;
+    if (prev > 30 && secondsLeft <= 30 && secondsLeft > 0) playTimerWarning(false);
+    if (prev > 10 && secondsLeft <= 10 && secondsLeft > 0) playTimerWarning(true);
+  }, [secondsLeft]);
 
   useEffect(() => {
     if (!endsAt) return;

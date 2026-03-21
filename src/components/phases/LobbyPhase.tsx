@@ -4,8 +4,9 @@ import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Doc } from "../../../convex/_generated/dataModel";
 import { Check, Users, Share2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { playPlayerJoined } from "@/lib/sounds";
 
 interface LobbyPhaseProps {
   game: Doc<"games">;
@@ -23,6 +24,14 @@ export default function LobbyPhase({
   const startGame = useMutation(api.games.startGame);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
+  const prevPlayerCountRef = useRef(players.length);
+
+  useEffect(() => {
+    if (players.length > prevPlayerCountRef.current) {
+      playPlayerJoined();
+    }
+    prevPlayerCountRef.current = players.length;
+  }, [players.length]);
 
   async function shareOrCopy() {
     const url = window.location.href;
