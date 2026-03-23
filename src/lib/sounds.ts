@@ -216,8 +216,9 @@ export function playReactionSkull() {
   playFreqSweep(600, 200, 0.3, "sine", 0.07);
 }
 
-export function playReactionSleep() {
-  // Gentle soft whistle
-  playFreqSweep(400, 500, 0.2, "sine", 0.05);
-  setTimeout(() => playFreqSweep(500, 350, 0.25, "sine", 0.04), 200);
+export function playReactionRainbow() {
+  // Sparkly ascending sweep — like a shooting star
+  playFreqSweep(300, 900, 0.4, "sine", 0.06);
+  setTimeout(() => playFreqSweep(500, 1200, 0.3, "sine", 0.04), 100);
+  setTimeout(() => playTone(1400, 0.15, "sine", 0.03), 250);
 }
