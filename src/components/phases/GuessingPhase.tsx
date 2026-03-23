@@ -42,7 +42,7 @@ export default function GuessingPhase({
   const isClueGiver = myPlayer?._id === round.clueGiverId;
   const isHost = game.hostId === sessionId;
   const isPlayer = myPlayer !== null;
-  const canGuess = isPlayer && !isClueGiver;
+  const canGuess = isPlayer && !isClueGiver && !myPlayer?.isSpectator;
   const clueGiver = players.find((p) => p._id === round.clueGiverId);
 
   // Restore position from server on reconnect, or submit initial position

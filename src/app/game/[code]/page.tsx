@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import FluidBackground from "@/components/FluidBackground";
 import ChatPanel from "@/components/ChatPanel";
+import EmojiReactions from "@/components/EmojiReactions";
 
 export default function GamePage() {
   const params = useParams();
@@ -150,15 +151,15 @@ export default function GamePage() {
   const totalRounds = players?.length ?? 0;
   const hostPlayer = players?.find((p) => p.sessionId === game.hostId);
 
-  // Show join form if visitor isn't in the game and it's still in lobby
-  if (myPlayer === null && sessionId && game.status === "lobby") {
-    return <JoinInlineForm code={code} sessionId={sessionId} />;
-  }
-
-  // Spectator view for non-players during active game
-  if (myPlayer === null && sessionId && game.status !== "lobby") {
-    // Still show the game — they can watch as a spectator
-    // The phase components handle the spectator case internally
+  // Show join form if visitor isn't in the game yet
+  if (myPlayer === null && sessionId) {
+    return (
+      <JoinInlineForm
+        code={code}
+        sessionId={sessionId}
+        isSpectating={game.status !== "lobby"}
+      />
+    );
   }
 
   return (
@@ -177,6 +178,9 @@ export default function GamePage() {
         sessionId={sessionId}
         myPlayerId={myPlayer._id}
       />
+    )}
+    {game && sessionId && myPlayer && game.status !== "lobby" && game.status !== "game_over" && (
+      <EmojiReactions gameId={game._id} sessionId={sessionId} />
     )}
     <div className="flex min-h-screen flex-col">
       <GameHeader
@@ -297,6 +301,7 @@ export default function GamePage() {
                 isHost={isHost}
                 sessionId={sessionId}
                 playerScores={playerScores}
+                myPlayer={myPlayer ?? null}
               />
             </motion.div>
           )}
@@ -310,9 +315,11 @@ export default function GamePage() {
 function JoinInlineForm({
   code,
   sessionId,
+  isSpectating = false,
 }: {
   code: string;
   sessionId: string;
+  isSpectating?: boolean;
 }) {
   const joinGame = useMutation(api.games.joinGame);
   const [name, setName] = useState("");
@@ -341,7 +348,11 @@ function JoinInlineForm({
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-primary">Aligned</h1>
           <p className="mt-2 text-text-secondary">
-            Join game <span className="font-bold tracking-widest">{code}</span>
+            {isSpectating ? (
+              <>Game <span className="font-bold tracking-widest">{code}</span> is in progress</>
+            ) : (
+              <>Join game <span className="font-bold tracking-widest">{code}</span></>
+            )}
           </p>
         </div>
         <div className="glass-card rounded-2xl p-6 shadow-lg space-y-4">
@@ -361,8 +372,17 @@ function JoinInlineForm({
             disabled={loading}
             className="w-full rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
           >
-            {loading ? "Joining..." : "Join Game"}
+            {loading
+              ? "Joining..."
+              : isSpectating
+                ? "Join as Spectator"
+                : "Join Game"}
           </button>
+          {isSpectating && (
+            <p className="text-center text-xs text-text-secondary">
+              You&apos;ll watch this game and play in the next round
+            </p>
+          )}
         </div>
       </div>
     </div>

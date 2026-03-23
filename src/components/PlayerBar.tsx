@@ -1,5 +1,6 @@
 "use client";
 
+import { Eye } from "lucide-react";
 import { Doc } from "../../convex/_generated/dataModel";
 
 interface PlayerBarProps {
@@ -17,7 +18,12 @@ export default function PlayerBar({
   playerScores,
   showScores = false,
 }: PlayerBarProps) {
-  const sorted = [...players].sort((a, b) => a.order - b.order);
+  const sorted = [...players].sort((a, b) => {
+    // Spectators after regular players
+    if (a.isSpectator && !b.isSpectator) return 1;
+    if (!a.isSpectator && b.isSpectator) return -1;
+    return a.order - b.order;
+  });
 
   return (
     <div className="flex justify-center gap-2 px-4 py-2">
@@ -32,7 +38,7 @@ export default function PlayerBar({
               <div
                 className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white transition-all ${
                   isClueGiver ? "ring-2 ring-offset-2" : ""
-                } ${!player.isConnected ? "opacity-40" : ""}`}
+                } ${!player.isConnected || player.isSpectator ? "opacity-40" : ""}`}
                 style={{
                   backgroundColor: player.color,
                   ...(isClueGiver
@@ -42,13 +48,17 @@ export default function PlayerBar({
               >
                 {player.name.charAt(0).toUpperCase()}
               </div>
-              {showScores && (
+              {player.isSpectator ? (
+                <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
+                  <Eye className="h-3 w-3 text-text-secondary" />
+                </div>
+              ) : showScores ? (
                 <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold shadow-sm"
                   style={{ color: player.color }}
                 >
                   {score}
                 </div>
-              )}
+              ) : null}
             </div>
             <span
               className={`text-xs ${isMe ? "font-bold text-text" : "text-text-secondary"}`}

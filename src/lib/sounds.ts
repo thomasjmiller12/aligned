@@ -203,3 +203,21 @@ export function playPhaseTransition() {
 export function playPlayerJoined() {
   playFreqSweep(400, 600, 0.08, "sine", 0.08);
 }
+
+/** Emoji reaction sounds — unique per emoji */
+export function playReactionPoop() {
+  // Low bubbly splat
+  playTone(120, 0.2, "sawtooth", 0.06);
+  setTimeout(() => playTone(90, 0.15, "square", 0.04), 80);
+}
+
+export function playReactionSkull() {
+  // Spooky descending tone
+  playFreqSweep(600, 200, 0.3, "sine", 0.07);
+}
+
+export function playReactionSleep() {
+  // Gentle soft whistle
+  playFreqSweep(400, 500, 0.2, "sine", 0.05);
+  setTimeout(() => playFreqSweep(500, 350, 0.25, "sine", 0.04), 200);
+}

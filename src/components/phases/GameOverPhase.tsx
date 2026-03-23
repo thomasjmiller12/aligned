@@ -16,6 +16,7 @@ interface GameOverPhaseProps {
   isHost: boolean;
   sessionId: string;
   playerScores?: Record<string, number> | null;
+  myPlayer: Doc<"players"> | null;
 }
 
 export default function GameOverPhase({
@@ -24,6 +25,7 @@ export default function GameOverPhase({
   isHost,
   sessionId,
   playerScores,
+  myPlayer,
 }: GameOverPhaseProps) {
   const rounds = useQuery(api.games.getRounds, {
     gameId: game._id,
@@ -40,7 +42,8 @@ export default function GameOverPhase({
     return () => clearTimeout(timer);
   }, []);
 
-  const maxPossible = (players.length - 1) * 4 * players.length;
+  const activePlayers = players.filter((p) => !p.isSpectator);
+  const maxPossible = (activePlayers.length - 1) * 4 * activePlayers.length;
   const percentage =
     maxPossible > 0 ? Math.round((game.teamScore / maxPossible) * 100) : 0;
 
@@ -92,7 +95,7 @@ export default function GameOverPhase({
             Player Scores
           </h3>
           <div className="space-y-2">
-            {[...players]
+            {[...activePlayers]
               .sort((a, b) => (playerScores[b._id] ?? 0) - (playerScores[a._id] ?? 0))
               .map((player, i) => {
                 const score = playerScores[player._id] ?? 0;
@@ -163,6 +166,18 @@ export default function GameOverPhase({
               })}
           </div>
         </motion.div>
+      )}
+
+      {/* Spectator banner */}
+      {myPlayer?.isSpectator && (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.0 }}
+          className="rounded-xl bg-accent/10 px-4 py-3 text-sm font-medium text-accent"
+        >
+          You&apos;ll join as a player next game!
+        </motion.p>
       )}
 
       {/* Actions */}

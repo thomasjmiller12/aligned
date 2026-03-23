@@ -715,14 +715,14 @@ export const sendReaction = mutation({
       .first();
     if (!player) throw new Error("Player not found");
 
-    // Light rate limit: max 5 reactions per second per player
+    // Rate limit: max 50 reactions per second per player
     const recent = await ctx.db
       .query("reactions")
       .withIndex("by_game_time", (q) => q.eq("gameId", gameId))
       .order("desc")
       .filter((q) => q.eq(q.field("playerId"), player._id))
-      .take(5);
-    if (recent.length >= 5 && Date.now() - recent[4].createdAt < 1000) return;
+      .take(50);
+    if (recent.length >= 50 && Date.now() - recent[49].createdAt < 1000) return;
 
     await ctx.db.insert("reactions", {
       gameId,

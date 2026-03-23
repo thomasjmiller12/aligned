@@ -17,6 +17,7 @@ export default defineSchema({
     settings: v.object({
       clueTimerSeconds: v.number(),
       guessTimerSeconds: v.number(),
+      personalizedCount: v.optional(v.number()),
     }),
     timerEndsAt: v.optional(v.number()),
   })
@@ -30,6 +31,7 @@ export default defineSchema({
     color: v.string(),
     order: v.number(),
     isConnected: v.boolean(),
+    isSpectator: v.optional(v.boolean()),
   })
     .index("by_game", ["gameId"])
     .index("by_session", ["sessionId"]),
@@ -81,6 +83,16 @@ export default defineSchema({
     playerName: v.string(),
     playerColor: v.string(),
     body: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_game_time", ["gameId", "createdAt"]),
+
+  reactions: defineTable({
+    gameId: v.id("games"),
+    playerId: v.id("players"),
+    playerName: v.string(),
+    playerColor: v.string(),
+    emoji: v.string(),
     createdAt: v.number(),
   })
     .index("by_game_time", ["gameId", "createdAt"]),
