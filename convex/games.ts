@@ -83,7 +83,8 @@ export const joinGame = mutation({
       .first();
 
     if (!game) throw new Error("Game not found");
-    if (game.status !== "lobby") throw new Error("Game already started");
+
+    const isMidGame = game.status !== "lobby";
 
     // Check if player already in game (reconnecting)
     const existingPlayer = await ctx.db
@@ -111,6 +112,7 @@ export const joinGame = mutation({
       color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
       order: players.length,
       isConnected: true,
+      ...(isMidGame ? { isSpectator: true } : {}),
     });
 
     return { gameId: game._id, playerId };
@@ -262,7 +264,7 @@ export const lockGuess = mutation({
       .query("players")
       .withIndex("by_game", (q) => q.eq("gameId", round.gameId))
       .collect();
-    const totalGuessers = players.length - 1; // exclude clue giver
+    const totalGuessers = players.filter((p) => !p.isSpectator).length - 1; // exclude clue giver and spectators
 
     const allGuesses = await ctx.db
       .query("guesses")
@@ -455,6 +457,36 @@ export const nextRound = mutation({
   },
 });
 
+export const kickPlayer = mutation({
+  args: {
+    gameId: v.id("games"),
+    sessionId: v.string(),
+    playerId: v.id("players"),
+  },
+  handler: async (ctx, { gameId, sessionId, playerId }) => {
+    const game = await ctx.db.get(gameId);
+    if (!game) throw new Error("Game not found");
+    if (game.hostId !== sessionId) throw new Error("Only the host can kick players");
+    if (game.status !== "lobby") throw new Error("Can only kick players in the lobby");
+
+    const player = await ctx.db.get(playerId);
+    if (!player || player.gameId !== gameId) throw new Error("Player not found in this game");
+    if (player.sessionId === sessionId) throw new Error("Cannot kick yourself");
+
+    // Delete presence data
+    const presence = await ctx.db
+      .query("presence")
+      .withIndex("by_game_player", (q) => q.eq("gameId", gameId).eq("playerId", playerId))
+      .first();
+    if (presence) {
+      await ctx.db.delete(presence._id);
+    }
+
+    // Delete the player
+    await ctx.db.delete(playerId);
+  },
+});
+
 export const claimHost = mutation({
   args: { gameId: v.id("games"), sessionId: v.string() },
   handler: async (ctx, { gameId, sessionId }) => {
@@ -505,6 +537,26 @@ export const playAgain = mutation({
       .collect();
     for (const msg of messages) {
       await ctx.db.delete(msg._id);
+    }
+
+    // Delete reactions
+    const reactions = await ctx.db
+      .query("reactions")
+      .withIndex("by_game_time", (q) => q.eq("gameId", gameId))
+      .collect();
+    for (const reaction of reactions) {
+      await ctx.db.delete(reaction._id);
+    }
+
+    // Promote spectators to full players
+    const players = await ctx.db
+      .query("players")
+      .withIndex("by_game", (q) => q.eq("gameId", gameId))
+      .collect();
+    for (const player of players) {
+      if (player.isSpectator) {
+        await ctx.db.patch(player._id, { isSpectator: false });
+      }
     }
 
     // Reset game
@@ -644,6 +696,63 @@ export const getPlayerScores = query({
       }
     }
     return scores;
+  },
+});
+
+// Reactions
+
+export const sendReaction = mutation({
+  args: {
+    gameId: v.id("games"),
+    sessionId: v.string(),
+    emoji: v.string(),
+  },
+  handler: async (ctx, { gameId, sessionId, emoji }) => {
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .first();
+    if (!player) throw new Error("Player not found");
+
+    // Light rate limit: max 5 reactions per second per player
+    const recent = await ctx.db
+      .query("reactions")
+      .withIndex("by_game_time", (q) => q.eq("gameId", gameId))
+      .order("desc")
+      .filter((q) => q.eq(q.field("playerId"), player._id))
+      .take(5);
+    if (recent.length >= 5 && Date.now() - recent[4].createdAt < 1000) return;
+
+    await ctx.db.insert("reactions", {
+      gameId,
+      playerId: player._id,
+      playerName: player.name,
+      playerColor: player.color,
+      emoji,
+      createdAt: Date.now(),
+    });
+  },
+});
+
+export const getReactions = query({
+  args: { gameId: v.id("games"), sessionId: v.string() },
+  handler: async (ctx, { gameId, sessionId }) => {
+    const cutoff = Date.now() - 20_000; // only last 20 seconds
+    const reactions = await ctx.db
+      .query("reactions")
+      .withIndex("by_game_time", (q) => q.eq("gameId", gameId).gte("createdAt", cutoff))
+      .collect();
+    // Find calling player to exclude their own reactions (shown optimistically)
+    const me = await ctx.db
+      .query("players")
+      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .first();
+    if (me) {
+      return reactions.filter((r) => r.playerId !== me._id);
+    }
+    return reactions;
   },
 });
 

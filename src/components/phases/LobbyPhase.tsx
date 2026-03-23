@@ -3,7 +3,7 @@
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Doc } from "../../../convex/_generated/dataModel";
-import { Check, Users, Share2 } from "lucide-react";
+import { Check, Users, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { playPlayerJoined } from "@/lib/sounds";
@@ -22,6 +22,7 @@ export default function LobbyPhase({
   sessionId,
 }: LobbyPhaseProps) {
   const startGame = useMutation(api.games.startGame);
+  const kickPlayer = useMutation(api.games.kickPlayer);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const prevPlayerCountRef = useRef(players.length);
@@ -112,6 +113,17 @@ export default function LobbyPhase({
                   </span>
                 )}
               </span>
+              {isHost && player.sessionId !== sessionId && (
+                <button
+                  onClick={() =>
+                    kickPlayer({ gameId: game._id, sessionId, playerId: player._id })
+                  }
+                  className="ml-1 flex h-5 w-5 items-center justify-center rounded-full text-text-secondary/50 transition-colors hover:bg-red-100 hover:text-red-500"
+                  title={`Kick ${player.name}`}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
             </motion.div>
           ))}
         </div>
