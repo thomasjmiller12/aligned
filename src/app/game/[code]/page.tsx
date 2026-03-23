@@ -149,7 +149,6 @@ export default function GamePage() {
 
   const isHost = game.hostId === sessionId;
   const totalRounds = players?.length ?? 0;
-  const hostPlayer = players?.find((p) => p.sessionId === game.hostId);
 
   // Show join form if visitor isn't in the game yet
   if (myPlayer === null && sessionId) {
@@ -201,14 +200,6 @@ export default function GamePage() {
         />
       )}
 
-      {/* Host transfer — shown when current user is not host, during active game */}
-      {!isHost && myPlayer && game.status !== "lobby" && (
-        <HostTransferBanner
-          gameId={game._id}
-          sessionId={sessionId}
-          hostName={hostPlayer?.name}
-        />
-      )}
 
       <main className="flex flex-1 flex-col items-center px-4 pb-8">
         <AnimatePresence mode="popLayout">
@@ -389,38 +380,3 @@ function JoinInlineForm({
   );
 }
 
-function HostTransferBanner({
-  gameId,
-  sessionId,
-  hostName,
-}: {
-  gameId: Id<"games">;
-  sessionId: string;
-  hostName: string | undefined;
-}) {
-  const claimHost = useMutation(api.games.claimHost);
-  const [claiming, setClaiming] = useState(false);
-
-  return (
-    <div className="mx-4 mb-1 flex items-center justify-center gap-2 text-xs text-text-secondary">
-      <span>
-        Waiting on {hostName ?? "host"}?
-      </span>
-      <button
-        onClick={async () => {
-          if (claiming) return;
-          setClaiming(true);
-          try {
-            await claimHost({ gameId, sessionId });
-          } catch {
-            setClaiming(false);
-          }
-        }}
-        disabled={claiming}
-        className="font-medium text-primary underline hover:text-primary/80 disabled:opacity-50"
-      >
-        {claiming ? "Transferring..." : "Become host"}
-      </button>
-    </div>
-  );
-}
