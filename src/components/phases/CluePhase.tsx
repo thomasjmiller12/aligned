@@ -90,7 +90,7 @@ export default function CluePhase({
                 placeholder="Type your clue..."
                 value={clueText}
                 onChange={(e) => setClueText(e.target.value)}
-                maxLength={50}
+                maxLength={250}
                 autoFocus
                 className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-center text-xl font-semibold outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleSubmitClue()}
