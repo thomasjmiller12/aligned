@@ -22,6 +22,11 @@ const PLAYER_COLORS = [
   "#E11D48",
 ];
 
+function pickColor(requested: string | undefined, fallback: string): string {
+  if (requested && PLAYER_COLORS.includes(requested)) return requested;
+  return fallback;
+}
+
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   let code = "";
@@ -32,8 +37,12 @@ function generateCode(): string {
 }
 
 export const createGame = mutation({
-  args: { hostName: v.string(), sessionId: v.string() },
-  handler: async (ctx, { hostName, sessionId }) => {
+  args: {
+    hostName: v.string(),
+    sessionId: v.string(),
+    color: v.optional(v.string()),
+  },
+  handler: async (ctx, { hostName, sessionId, color }) => {
     // Generate a unique code
     let code: string;
     let existing;
@@ -61,7 +70,7 @@ export const createGame = mutation({
       gameId,
       sessionId,
       name: hostName,
-      color: PLAYER_COLORS[0],
+      color: pickColor(color, PLAYER_COLORS[0]),
       order: 0,
       isConnected: true,
     });
@@ -75,8 +84,9 @@ export const joinGame = mutation({
     code: v.string(),
     playerName: v.string(),
     sessionId: v.string(),
+    color: v.optional(v.string()),
   },
-  handler: async (ctx, { code, playerName, sessionId }) => {
+  handler: async (ctx, { code, playerName, sessionId, color }) => {
     const game = await ctx.db
       .query("games")
       .withIndex("by_code", (q) => q.eq("code", code.toUpperCase()))
@@ -94,7 +104,13 @@ export const joinGame = mutation({
       .first();
 
     if (existingPlayer) {
-      await ctx.db.patch(existingPlayer._id, { isConnected: true });
+      const patch: { isConnected: boolean; color?: string } = {
+        isConnected: true,
+      };
+      if (color && PLAYER_COLORS.includes(color)) {
+        patch.color = color;
+      }
+      await ctx.db.patch(existingPlayer._id, patch);
       return { gameId: game._id, playerId: existingPlayer._id };
     }
 
@@ -109,7 +125,10 @@ export const joinGame = mutation({
       gameId: game._id,
       sessionId,
       name: playerName,
-      color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
+      color: pickColor(
+        color,
+        PLAYER_COLORS[players.length % PLAYER_COLORS.length]
+      ),
       order: players.length,
       isConnected: true,
       ...(isMidGame ? { isSpectator: true } : {}),
@@ -289,6 +308,43 @@ export const lockGuess = mutation({
         timerEndsAt: undefined,
       });
     }
+  },
+});
+
+export const unlockGuess = mutation({
+  args: { roundId: v.id("rounds"), sessionId: v.string() },
+  handler: async (ctx, { roundId, sessionId }) => {
+    const round = await ctx.db.get(roundId);
+    if (!round) throw new Error("Round not found");
+    if (round.status !== "guessing") {
+      throw new Error("Round is no longer accepting changes");
+    }
+
+    const game = await ctx.db.get(round.gameId);
+    if (!game || game.status !== "guessing") {
+      throw new Error("Game is no longer accepting changes");
+    }
+
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+      .filter((q) => q.eq(q.field("gameId"), round.gameId))
+      .first();
+    if (!player) throw new Error("Player not found");
+    if (player._id === round.clueGiverId) {
+      throw new Error("Clue-giver has no guess to unlock");
+    }
+
+    const guess = await ctx.db
+      .query("guesses")
+      .withIndex("by_round_player", (q) =>
+        q.eq("roundId", roundId).eq("playerId", player._id)
+      )
+      .first();
+    if (!guess) throw new Error("No guess to unlock");
+    if (!guess.lockedIn) return;
+
+    await ctx.db.patch(guess._id, { lockedIn: false });
   },
 });
 

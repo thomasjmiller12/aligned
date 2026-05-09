@@ -6,7 +6,7 @@ import { Doc } from "../../../convex/_generated/dataModel";
 import { useCallback, useEffect, useRef, useState } from "react";
 import Timer from "../Timer";
 import SpectrumDial from "../SpectrumDial";
-import { Lock, Eye } from "lucide-react";
+import { Lock, LockOpen, Eye } from "lucide-react";
 import { playLockIn } from "@/lib/sounds";
 
 
@@ -32,6 +32,7 @@ export default function GuessingPhase({
   const guesses = useQuery(api.games.getGuesses, { roundId: round._id });
   const submitGuess = useMutation(api.games.submitGuess);
   const lockGuessMutation = useMutation(api.games.lockGuess);
+  const unlockGuessMutation = useMutation(api.games.unlockGuess);
   const revealRound = useMutation(api.games.revealRound);
 
   const [myPosition, setMyPosition] = useState(90);
@@ -78,6 +79,7 @@ export default function GuessingPhase({
   );
 
   const [lockPending, setLockPending] = useState(false);
+  const [unlockPending, setUnlockPending] = useState(false);
   const [revealPending, setRevealPending] = useState(false);
 
   async function handleLockIn() {
@@ -89,6 +91,19 @@ export default function GuessingPhase({
       playLockIn();
     } finally {
       setLockPending(false);
+    }
+  }
+
+  async function handleUnlock() {
+    if (unlockPending) return;
+    setUnlockPending(true);
+    try {
+      await unlockGuessMutation({ roundId: round._id, sessionId });
+      setIsLocked(false);
+    } catch {
+      // Round may have already been revealed — UI will reflect that on next query
+    } finally {
+      setUnlockPending(false);
     }
   }
 
@@ -174,9 +189,19 @@ export default function GuessingPhase({
           </span>
         </div>
       ) : effectiveLocked ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-success/10 px-4 py-3 text-success">
-          <Lock className="h-5 w-5" />
-          <span className="font-medium">Locked in!</span>
+        <div className="flex items-center justify-between gap-3 rounded-xl bg-success/10 px-4 py-3 text-success">
+          <div className="flex items-center gap-2">
+            <Lock className="h-5 w-5" />
+            <span className="font-medium">Locked in!</span>
+          </div>
+          <button
+            onClick={handleUnlock}
+            disabled={unlockPending}
+            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-success underline-offset-2 transition-colors hover:bg-success/10 hover:underline disabled:opacity-50"
+          >
+            <LockOpen className="h-4 w-4" />
+            {unlockPending ? "Unlocking..." : "Unlock to change"}
+          </button>
         </div>
       ) : (
         <button
