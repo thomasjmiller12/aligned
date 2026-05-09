@@ -1,14 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useMutation } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { getSessionId } from "@/lib/session";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Check, Sparkles, Users } from "lucide-react";
+import { Sparkles, Users } from "lucide-react";
 import FluidBackground from "@/components/FluidBackground";
-import { PLAYER_COLORS } from "@/lib/colors";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -20,11 +19,6 @@ export default function LandingPage() {
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const initialColor = useMemo(
-    () => PLAYER_COLORS[Math.floor(Math.random() * PLAYER_COLORS.length)],
-    []
-  );
-  const [color, setColor] = useState<string>(initialColor);
 
   async function handleHost() {
     if (!name.trim()) return setError("Enter your name");
@@ -32,11 +26,7 @@ export default function LandingPage() {
     setError("");
     try {
       const sessionId = getSessionId();
-      const result = await createGame({
-        hostName: name.trim(),
-        sessionId,
-        color,
-      });
+      const result = await createGame({ hostName: name.trim(), sessionId });
       router.push(`/game/${result.code}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to create game");
@@ -57,7 +47,6 @@ export default function LandingPage() {
         code: code.trim().toUpperCase(),
         playerName: name.trim(),
         sessionId,
-        color,
       });
       router.push(`/game/${code.trim().toUpperCase()}`);
     } catch (e: unknown) {
@@ -134,13 +123,11 @@ export default function LandingPage() {
                 className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-lg outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleHost()}
               />
-              <ColorPicker selected={color} onSelect={setColor} />
               {error && <p className="text-sm text-red-500">{error}</p>}
               <button
                 onClick={handleHost}
                 disabled={loading}
-                className="w-full rounded-xl px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-                style={{ backgroundColor: color }}
+                className="w-full rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? "Creating..." : "Create Game"}
               </button>
@@ -182,13 +169,11 @@ export default function LandingPage() {
                 className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-lg outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 onKeyDown={(e) => e.key === "Enter" && handleJoin()}
               />
-              <ColorPicker selected={color} onSelect={setColor} />
               {error && <p className="text-sm text-red-500">{error}</p>}
               <button
                 onClick={handleJoin}
                 disabled={loading}
-                className="w-full rounded-xl px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-                style={{ backgroundColor: color }}
+                className="w-full rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
               >
                 {loading ? "Joining..." : "Join Game"}
               </button>
@@ -221,46 +206,6 @@ export default function LandingPage() {
           Source on GitHub
         </a>
       </motion.div>
-    </div>
-  );
-}
-
-function ColorPicker({
-  selected,
-  onSelect,
-}: {
-  selected: string;
-  onSelect: (color: string) => void;
-}) {
-  return (
-    <div>
-      <p className="mb-2 text-xs font-medium uppercase tracking-wider text-text-secondary">
-        Pick your color
-      </p>
-      <div className="grid grid-cols-8 gap-2">
-        {PLAYER_COLORS.map((c) => {
-          const isSelected = selected === c;
-          return (
-            <button
-              key={c}
-              type="button"
-              onClick={() => onSelect(c)}
-              aria-label={`Choose color ${c}`}
-              aria-pressed={isSelected}
-              className="relative flex aspect-square items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
-              style={{
-                backgroundColor: c,
-                outline: isSelected ? `2px solid ${c}` : "none",
-                outlineOffset: 2,
-              }}
-            >
-              {isSelected && (
-                <Check className="h-3.5 w-3.5 text-white drop-shadow" />
-              )}
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }

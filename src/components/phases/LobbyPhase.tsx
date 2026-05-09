@@ -7,6 +7,7 @@ import { Check, Users, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { playPlayerJoined } from "@/lib/sounds";
+import { PLAYER_COLORS } from "@/lib/colors";
 
 interface LobbyPhaseProps {
   game: Doc<"games">;
@@ -23,9 +24,12 @@ export default function LobbyPhase({
 }: LobbyPhaseProps) {
   const startGame = useMutation(api.games.startGame);
   const kickPlayer = useMutation(api.games.kickPlayer);
+  const updatePlayerColor = useMutation(api.games.updatePlayerColor);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const prevPlayerCountRef = useRef(players.length);
+
+  const me = players.find((p) => p.sessionId === sessionId);
 
   useEffect(() => {
     if (players.length > prevPlayerCountRef.current) {
@@ -128,6 +132,41 @@ export default function LobbyPhase({
           ))}
         </div>
       </div>
+
+      {/* Color Picker */}
+      {me && (
+        <div className="glass-card rounded-2xl p-5 shadow-sm">
+          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-text-secondary">
+            Your color
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {PLAYER_COLORS.map((c) => {
+              const isSelected = me.color === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() =>
+                    updatePlayerColor({ gameId: game._id, sessionId, color: c })
+                  }
+                  aria-label={`Choose color ${c}`}
+                  aria-pressed={isSelected}
+                  className="relative flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110 active:scale-95"
+                  style={{
+                    backgroundColor: c,
+                    outline: isSelected ? `2px solid ${c}` : "none",
+                    outlineOffset: 2,
+                  }}
+                >
+                  {isSelected && (
+                    <Check className="h-4 w-4 text-white drop-shadow" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Start Button */}
       {isHost && (
