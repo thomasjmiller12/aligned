@@ -29,7 +29,19 @@ interface Reaction {
   createdAt: number;
 }
 
+interface Combo {
+  id: string;
+  emoji: string;
+  count: number;
+  seed: number;
+  createdAt: number;
+}
+
 const MAX_LIFETIME_MS = 12000;
+const COMBO_LIFETIME_MS = 4000;
+const COMBO_WINDOW_MS = 2500;
+const COMBO_COOLDOWN_MS = 5000;
+const COMBO_MIN_PLAYERS = 3;
 
 function makeReaction(emoji: string, id: string): Reaction {
   return {
@@ -213,6 +225,59 @@ function RainbowFly({ y, seed }: { y: number; seed: number }) {
   );
 }
 
+/** ✨ Combo Burst: a giant emoji explosion in center-screen with shockwave rings */
+function ComboBurst({
+  emoji,
+  count,
+  seed,
+}: {
+  emoji: string;
+  count: number;
+  seed: number;
+}) {
+  const particleCount = 14;
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      {/* Shockwave rings */}
+      <div className="combo-ring combo-ring-1" />
+      <div className="combo-ring combo-ring-2" />
+      <div className="combo-ring combo-ring-3" />
+
+      {/* Burst particles flying outward */}
+      {Array.from({ length: particleCount }).map((_, i) => {
+        const angle = (i / particleCount) * 360 + seed * 30;
+        const rad = (angle * Math.PI) / 180;
+        const dist = 220 + seed * 120;
+        return (
+          <div
+            key={`cp-${i}`}
+            className="combo-particle absolute"
+            style={
+              {
+                "--tx": `${Math.cos(rad) * dist}px`,
+                "--ty": `${Math.sin(rad) * dist}px`,
+                animationDelay: `${i * 0.025}s`,
+              } as React.CSSProperties
+            }
+          >
+            <span className="text-3xl sm:text-4xl">{emoji}</span>
+          </div>
+        );
+      })}
+
+      {/* The MEGA emoji + label */}
+      <div className="combo-mega flex flex-col items-center">
+        <span className="combo-mega-emoji text-[110px] sm:text-[170px] leading-none drop-shadow-2xl">
+          {emoji}
+        </span>
+        <span className="combo-label mt-2 text-3xl font-black tracking-widest sm:text-5xl">
+          ×{count} SYNC!
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ── Main component ───────────────────────────────────────────
 
 export default function EmojiReactions({
@@ -224,10 +289,55 @@ export default function EmojiReactions({
 }) {
   const sendReaction = useMutation(api.games.sendReaction);
   const reactions = useQuery(api.games.getReactions, { gameId, sessionId });
+  const myPlayer = useQuery(api.games.getMyPlayer, { gameId, sessionId });
   const [floating, setFloating] = useState<Reaction[]>([]);
+  const [combos, setCombos] = useState<Combo[]>([]);
   const seenIds = useRef(new Set<string>());
   const initialLoadRef = useRef(true);
   const localIdCounter = useRef(0);
+
+  // Combo detection state
+  const trackedRef = useRef<{ playerId: string; emoji: string; ts: number }[]>([]);
+  const lastComboAtRef = useRef<Record<string, number>>({});
+  const myPlayerIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (myPlayer?._id) myPlayerIdRef.current = myPlayer._id;
+  }, [myPlayer]);
+
+  const checkCombo = useCallback(() => {
+    const now = Date.now();
+    trackedRef.current = trackedRef.current.filter(
+      (t) => now - t.ts < COMBO_WINDOW_MS
+    );
+    const byEmoji = new Map<string, { players: Set<string>; total: number }>();
+    for (const t of trackedRef.current) {
+      let entry = byEmoji.get(t.emoji);
+      if (!entry) {
+        entry = { players: new Set(), total: 0 };
+        byEmoji.set(t.emoji, entry);
+      }
+      entry.players.add(t.playerId);
+      entry.total++;
+    }
+    for (const [emoji, entry] of byEmoji) {
+      if (entry.players.size < COMBO_MIN_PLAYERS) continue;
+      const last = lastComboAtRef.current[emoji] ?? 0;
+      if (now - last < COMBO_COOLDOWN_MS) continue;
+      lastComboAtRef.current[emoji] = now;
+      const id = `combo-${now}-${emoji}`;
+      setCombos((prev) => [
+        ...prev,
+        { id, emoji, count: entry.total, seed: Math.random(), createdAt: now },
+      ]);
+      const sound = EMOJI_SOUNDS[emoji];
+      if (sound) {
+        sound();
+        setTimeout(sound, 130);
+        setTimeout(sound, 260);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!reactions) return;
@@ -241,19 +351,25 @@ export default function EmojiReactions({
       if (seenIds.current.has(r._id)) continue;
       seenIds.current.add(r._id);
       newReactions.push(makeReaction(r.emoji, r._id));
+      trackedRef.current.push({
+        playerId: r.playerId,
+        emoji: r.emoji,
+        ts: Date.now(),
+      });
     }
     if (newReactions.length > 0) {
       const sound = EMOJI_SOUNDS[newReactions[0].emoji];
       if (sound) sound();
       setFloating((prev) => [...prev, ...newReactions]);
+      checkCombo();
     }
-  }, [reactions]);
+  }, [reactions, checkCombo]);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setFloating((prev) =>
-        prev.filter((r) => Date.now() - r.createdAt < MAX_LIFETIME_MS)
-      );
+      const now = Date.now();
+      setFloating((prev) => prev.filter((r) => now - r.createdAt < MAX_LIFETIME_MS));
+      setCombos((prev) => prev.filter((c) => now - c.createdAt < COMBO_LIFETIME_MS));
     }, 1500);
     return () => clearInterval(interval);
   }, []);
@@ -264,9 +380,12 @@ export default function EmojiReactions({
       const sound = EMOJI_SOUNDS[emoji];
       if (sound) sound();
       setFloating((prev) => [...prev, makeReaction(emoji, localId)]);
+      const myId = myPlayerIdRef.current ?? `me-${sessionId}`;
+      trackedRef.current.push({ playerId: myId, emoji, ts: Date.now() });
+      checkCombo();
       sendReaction({ gameId, sessionId, emoji });
     },
-    [gameId, sessionId, sendReaction]
+    [gameId, sessionId, sendReaction, checkCombo]
   );
 
   return (
@@ -355,6 +474,71 @@ export default function EmojiReactions({
           85% { opacity: 0.4; }
           100% { stroke-dashoffset: -400; opacity: 0; }
         }
+
+        /* ── ✨ Combo Burst ── */
+        .combo-mega {
+          animation: combo-mega-pop 3.8s cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+        }
+        @keyframes combo-mega-pop {
+          0% { transform: scale(0) rotate(-30deg); opacity: 0; }
+          8% { transform: scale(1.5) rotate(8deg); opacity: 1; }
+          16% { transform: scale(1.05) rotate(-4deg); opacity: 1; }
+          24% { transform: scale(1.2) rotate(2deg); opacity: 1; }
+          32% { transform: scale(1.1) rotate(0deg); opacity: 1; }
+          82% { transform: scale(1.1) rotate(0deg); opacity: 1; }
+          100% { transform: scale(1.8) rotate(0deg); opacity: 0; }
+        }
+
+        .combo-mega-emoji {
+          animation: combo-mega-wobble 0.6s ease-in-out infinite;
+          display: inline-block;
+        }
+        @keyframes combo-mega-wobble {
+          0%, 100% { transform: rotate(-3deg); }
+          50% { transform: rotate(3deg); }
+        }
+
+        .combo-label {
+          color: #E8553A;
+          animation: combo-label-shake 0.3s ease-in-out infinite;
+          text-shadow:
+            2px 2px 0 #fff,
+            -2px 2px 0 #fff,
+            2px -2px 0 #fff,
+            -2px -2px 0 #fff,
+            0 0 24px rgba(232, 85, 58, 0.6);
+        }
+        @keyframes combo-label-shake {
+          0%, 100% { transform: translateX(-1px) rotate(-2deg) scale(1); }
+          50% { transform: translateX(1px) rotate(2deg) scale(1.05); }
+        }
+
+        .combo-ring {
+          position: absolute;
+          border-radius: 50%;
+          border: 5px solid currentColor;
+          width: 120px;
+          height: 120px;
+          opacity: 0;
+        }
+        .combo-ring-1 { color: #E8553A; animation: combo-ring-expand 1.6s ease-out forwards; }
+        .combo-ring-2 { color: #2A9D8F; animation: combo-ring-expand 1.8s ease-out 0.18s forwards; }
+        .combo-ring-3 { color: #FFD23F; animation: combo-ring-expand 2.0s ease-out 0.36s forwards; }
+        @keyframes combo-ring-expand {
+          0% { transform: scale(0); opacity: 0.85; border-width: 6px; }
+          100% { transform: scale(9); opacity: 0; border-width: 1px; }
+        }
+
+        .combo-particle {
+          animation: combo-particle-burst 2.5s ease-out forwards;
+          opacity: 0;
+        }
+        @keyframes combo-particle-burst {
+          0% { transform: translate(0, 0) scale(0) rotate(0deg); opacity: 0; }
+          15% { transform: translate(calc(var(--tx) * 0.3), calc(var(--ty) * 0.3)) scale(1.2) rotate(120deg); opacity: 1; }
+          70% { transform: translate(calc(var(--tx) * 0.9), calc(var(--ty) * 0.9)) scale(0.7) rotate(540deg); opacity: 0.6; }
+          100% { transform: translate(var(--tx), var(--ty)) scale(0) rotate(720deg); opacity: 0; }
+        }
       `}</style>
 
       {/* Full-screen overlay */}
@@ -371,6 +555,11 @@ export default function EmojiReactions({
           }
           return null;
         })}
+
+        {/* Combo bursts — center-screen mega celebrations */}
+        {combos.map((c) => (
+          <ComboBurst key={c.id} emoji={c.emoji} count={c.count} seed={c.seed} />
+        ))}
       </div>
 
       {/* Reaction buttons */}
