@@ -670,6 +670,193 @@ registerVariant("ghost", {
   },
 });
 
+// Ray (manta): gliding diamond body with two translucent wings that beat (~1 in 64)
+registerVariant("ray", {
+  weight: 2.5,
+  sizeMul: 2.8,
+  speedMul: 0.55,
+  draw(ctx, t, time, alpha, headRadius, _speed, reducedMotion) {
+    // Wing beat sweeps the tips out and back — reads as flapping from above
+    const beat = reducedMotion ? 0 : Math.sin(time * 2.6 + t.wigglePhase);
+    const len = headRadius * 1.5; // nose to tail base
+    const span = headRadius * (1.75 + beat * 0.4); // half wingspan
+
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate(t.heading);
+
+    // Whip tail, trailing opposite the beat
+    ctx.beginPath();
+    ctx.moveTo(-len * 0.75, 0);
+    ctx.quadraticCurveTo(-len * 1.7, -beat * headRadius * 0.3, -len * 2.5, -beat * headRadius * 0.6);
+    ctx.strokeStyle = t.color;
+    ctx.lineWidth = Math.max(0.6, headRadius * 0.13);
+    ctx.lineCap = "round";
+    ctx.globalAlpha = alpha * 0.65;
+    ctx.stroke();
+
+    // Wings — mirrored bezier sweeps from nose to tip to tail base
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillStyle = t.color;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(len, 0);
+      ctx.bezierCurveTo(
+        len * 0.45, side * span * 0.7,
+        -len * 0.05, side * span,
+        -len * 0.5, side * span * 0.7
+      );
+      ctx.bezierCurveTo(
+        -len * 0.5, side * span * 0.3,
+        -len * 0.7, side * span * 0.1,
+        -len * 0.75, 0
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Opaque central ridge so the body reads through the wing overlap
+    ctx.beginPath();
+    ctx.ellipse(len * 0.05, 0, len * 0.62, headRadius * 0.4, 0, 0, Math.PI * 2);
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
+});
+
+// Angler: rare deep-sea silhouette with a bobbing lure glowing in the player's color (~1 in 265)
+registerVariant("angler", {
+  weight: 0.6,
+  sizeMul: 2.4,
+  speedMul: 0.5,
+  draw(ctx, t, time, alpha, headRadius, speed, reducedMotion) {
+    drawTadpoleTail(ctx, t, time, alpha * 0.8, headRadius * 0.85, speed, reducedMotion);
+
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate(t.heading);
+    ctx.globalAlpha = alpha;
+
+    // Body — near-black, so the lure carries the player's identity instead
+    ctx.beginPath();
+    ctx.ellipse(0, 0, headRadius * 1.15, headRadius * 0.95, 0, 0, Math.PI * 2);
+    ctx.fillStyle = "#1A1626";
+    ctx.fill();
+
+    // Gaping mouth
+    ctx.beginPath();
+    ctx.moveTo(headRadius * 0.5, -headRadius * 0.44);
+    ctx.lineTo(headRadius * 1.15, 0);
+    ctx.lineTo(headRadius * 0.5, headRadius * 0.44);
+    ctx.closePath();
+    ctx.fillStyle = "#0A0810";
+    ctx.fill();
+
+    // Teeth
+    ctx.fillStyle = "#FFF";
+    ctx.globalAlpha = alpha * 0.85;
+    for (let i = -1; i <= 1; i++) {
+      const ty = i * headRadius * 0.22;
+      ctx.beginPath();
+      ctx.moveTo(headRadius * 0.7, ty - headRadius * 0.09);
+      ctx.lineTo(headRadius * 0.98, ty);
+      ctx.lineTo(headRadius * 0.7, ty + headRadius * 0.09);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Eye
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(headRadius * 0.22, -headRadius * 0.4, headRadius * 0.2, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFF";
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(headRadius * 0.28, -headRadius * 0.4, headRadius * 0.1, 0, Math.PI * 2);
+    ctx.fillStyle = "#111";
+    ctx.fill();
+
+    // Lure — stalk arcs forward over the head, bulb bobbing on the end
+    const bob = reducedMotion ? 0 : Math.sin(time * 2.2 + t.wigglePhase) * headRadius * 0.26;
+    const lureX = headRadius * 1.5;
+    const lureY = -headRadius * 1.1 + bob;
+    ctx.beginPath();
+    ctx.moveTo(-headRadius * 0.25, -headRadius * 0.78);
+    ctx.quadraticCurveTo(headRadius * 0.85, -headRadius * 1.75, lureX, lureY);
+    ctx.strokeStyle = "#1A1626";
+    ctx.lineWidth = Math.max(0.5, headRadius * 0.11);
+    ctx.lineCap = "round";
+    ctx.stroke();
+
+    ctx.shadowColor = t.color;
+    ctx.shadowBlur = headRadius * 2.5;
+    ctx.beginPath();
+    ctx.arc(lureX, lureY, headRadius * 0.3, 0, Math.PI * 2);
+    ctx.fillStyle = t.color;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(lureX, lureY, headRadius * 0.13, 0, Math.PI * 2);
+    ctx.fillStyle = "#FFF";
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.fill();
+
+    ctx.restore(); // also clears shadowBlur
+    ctx.globalAlpha = 1;
+  },
+});
+
+// Puffer: inflates and bristles as it closes on the cursor, deflates as it drifts off (~1 in 45)
+registerVariant("puffer", {
+  weight: 3.5,
+  sizeMul: 2,
+  speedMul: 0.75,
+  draw(ctx, t, time, alpha, headRadius, speed, reducedMotion) {
+    // t.arrival is already the smoothed 0→1 cursor-proximity blend the physics computes
+    const puff = t.arrival;
+    const bodyRadius = headRadius * (1 + puff * 0.6);
+    const spikeLen = bodyRadius * 0.42 * puff;
+
+    // Tail tucks in as it inflates
+    drawTadpoleTail(ctx, t, time, alpha, headRadius * (1 - puff * 0.4), speed, reducedMotion);
+
+    if (spikeLen > 0.4) {
+      const SPIKES = 12;
+      const bristle = reducedMotion ? 0 : Math.sin(time * 9 + t.wigglePhase) * 0.06;
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.fillStyle = t.color;
+      for (let i = 0; i < SPIKES; i++) {
+        const a = t.heading + (i / SPIKES) * Math.PI * 2 + bristle;
+        const halfBase = 0.11;
+        ctx.beginPath();
+        ctx.moveTo(
+          t.x + Math.cos(a - halfBase) * bodyRadius,
+          t.y + Math.sin(a - halfBase) * bodyRadius
+        );
+        ctx.lineTo(
+          t.x + Math.cos(a) * (bodyRadius + spikeLen),
+          t.y + Math.sin(a) * (bodyRadius + spikeLen)
+        );
+        ctx.lineTo(
+          t.x + Math.cos(a + halfBase) * bodyRadius,
+          t.y + Math.sin(a + halfBase) * bodyRadius
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, bodyRadius, 0, Math.PI * 2);
+    ctx.fillStyle = t.color;
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+
+    drawEyes(ctx, t, alpha, bodyRadius * 0.75);
+  },
+});
+
 function drawTadpoleTail(
   ctx: CanvasRenderingContext2D,
   t: Tadpole,
