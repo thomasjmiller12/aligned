@@ -522,6 +522,33 @@ export const updatePlayerColor = mutation({
   },
 });
 
+export const updatePlayerName = mutation({
+  args: {
+    gameId: v.id("games"),
+    sessionId: v.string(),
+    name: v.string(),
+  },
+  handler: async (ctx, { gameId, sessionId, name }) => {
+    const trimmed = name.trim().slice(0, 20);
+    if (!trimmed) throw new Error("Name can't be empty");
+
+    const game = await ctx.db.get(gameId);
+    if (!game) throw new Error("Game not found");
+    if (game.status !== "lobby") {
+      throw new Error("Name can only be changed in the lobby");
+    }
+
+    const player = await ctx.db
+      .query("players")
+      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
+      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .first();
+    if (!player) throw new Error("Player not in this game");
+
+    await ctx.db.patch(player._id, { name: trimmed });
+  },
+});
+
 export const kickPlayer = mutation({
   args: {
     gameId: v.id("games"),

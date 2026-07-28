@@ -25,11 +25,14 @@ export default function LobbyPhase({
   const startGame = useMutation(api.games.startGame);
   const kickPlayer = useMutation(api.games.kickPlayer);
   const updatePlayerColor = useMutation(api.games.updatePlayerColor);
+  const updatePlayerName = useMutation(api.games.updatePlayerName);
   const [copied, setCopied] = useState(false);
   const [starting, setStarting] = useState(false);
   const prevPlayerCountRef = useRef(players.length);
 
   const me = players.find((p) => p.sessionId === sessionId);
+  const [nameDraft, setNameDraft] = useState(me?.name ?? "");
+  const canSaveName = !!nameDraft.trim() && nameDraft.trim() !== me?.name;
 
   useEffect(() => {
     if (players.length > prevPlayerCountRef.current) {
@@ -37,6 +40,28 @@ export default function LobbyPhase({
     }
     prevPlayerCountRef.current = players.length;
   }, [players.length]);
+
+  // Follow the server name (initial load, or a change from another tab) without
+  // clobbering whatever the player is currently typing.
+  const serverNameRef = useRef(me?.name);
+  useEffect(() => {
+    if (me?.name !== undefined && me.name !== serverNameRef.current) {
+      serverNameRef.current = me.name;
+      setNameDraft(me.name);
+    }
+  }, [me?.name]);
+
+  async function handleNameSubmit(e?: React.FormEvent) {
+    e?.preventDefault();
+    const trimmed = nameDraft.trim();
+    if (!trimmed) return setNameDraft(me?.name ?? "");
+    if (trimmed === me?.name) return;
+    try {
+      await updatePlayerName({ gameId: game._id, sessionId, name: trimmed });
+    } catch {
+      setNameDraft(me?.name ?? "");
+    }
+  }
 
   async function shareOrCopy() {
     const url = window.location.href;
@@ -133,13 +158,41 @@ export default function LobbyPhase({
         </div>
       </div>
 
-      {/* Color Picker */}
+      {/* You: name + color */}
       {me && (
-        <div className="glass-card rounded-2xl p-5 shadow-sm">
-          <p className="mb-3 text-xs font-medium uppercase tracking-wider text-text-secondary">
-            Your color
-          </p>
-          <div className="flex flex-wrap justify-center gap-2">
+        <div className="glass-card space-y-5 rounded-2xl p-5 shadow-sm">
+          <div>
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-text-secondary">
+              Your name
+            </p>
+            <form
+              onSubmit={handleNameSubmit}
+              className="mx-auto flex max-w-xs items-center gap-2"
+            >
+              <input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                onBlur={handleNameSubmit}
+                maxLength={20}
+                placeholder="Your name"
+                aria-label="Your name"
+                className="min-w-0 flex-1 rounded-xl border border-white/60 bg-white/70 px-4 py-2.5 text-center text-base font-medium outline-none transition-colors focus:border-primary/50"
+              />
+              <button
+                type="submit"
+                disabled={!canSaveName}
+                className="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-30"
+              >
+                Save
+              </button>
+            </form>
+          </div>
+
+          <div>
+            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-text-secondary">
+              Your color
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
             {PLAYER_COLORS.map((c) => {
               const isSelected = me.color === c;
               return (
@@ -164,6 +217,7 @@ export default function LobbyPhase({
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       )}
