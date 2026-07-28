@@ -828,23 +828,23 @@ export const sendReaction = mutation({
 });
 
 export const getReactions = query({
-  args: { gameId: v.id("games"), sessionId: v.string() },
-  handler: async (ctx, { gameId, sessionId }) => {
-    const cutoff = Date.now() - 20_000; // only last 20 seconds
-    const reactions = await ctx.db
+  // sessionId is accepted but unused: keying the subscription on gameId alone
+  // means every client in a game shares one query result, so an insert re-runs
+  // this once instead of once per player. Callers filter out their own
+  // reactions (which they render optimistically) client-side.
+  args: { gameId: v.id("games"), sessionId: v.optional(v.string()) },
+  handler: async (ctx, { gameId }) => {
+    // Short window: the longest reaction animation is ~4s, so anything older
+    // is already discarded by the client. Keeping this tight keeps the payload
+    // small when a lobby is spamming emoji.
+    const cutoff = Date.now() - 6_000;
+    return ctx.db
       .query("reactions")
-      .withIndex("by_game_time", (q) => q.eq("gameId", gameId).gte("createdAt", cutoff))
-      .collect();
-    // Find calling player to exclude their own reactions (shown optimistically)
-    const me = await ctx.db
-      .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), gameId))
-      .first();
-    if (me) {
-      return reactions.filter((r) => r.playerId !== me._id);
-    }
-    return reactions;
+      .withIndex("by_game_time", (q) =>
+        q.eq("gameId", gameId).gte("createdAt", cutoff)
+      )
+      .order("desc")
+      .take(40);
   },
 });
 

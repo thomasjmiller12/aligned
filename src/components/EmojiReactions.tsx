@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useMutation, useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { Id } from "../../convex/_generated/dataModel";
@@ -17,6 +17,17 @@ const EMOJI_SOUNDS: Record<string, () => void> = {
   "💀": playReactionSkull,
   "🌈": playReactionRainbow,
 };
+
+// Each sound spins up oscillators; during a spam burst they pile up into an
+// audible mess and a chunk of main-thread work. One every 150ms is plenty.
+const SOUND_THROTTLE_MS = 150;
+let lastSoundAt = 0;
+function playReactionSound(emoji: string) {
+  const now = Date.now();
+  if (now - lastSoundAt < SOUND_THROTTLE_MS) return;
+  lastSoundAt = now;
+  EMOJI_SOUNDS[emoji]?.();
+}
 
 // ── Reaction data ────────────────────────────────────────────
 
@@ -37,11 +48,35 @@ interface Combo {
   createdAt: number;
 }
 
-const MAX_LIFETIME_MS = 12000;
+// Unmount as soon as the CSS animation is done — these used to linger for 12s
+// after finishing, so a busy lobby kept hundreds of dead composited layers
+// alive. Keep in sync with the animation durations in the stylesheet below.
+const LIFETIME_MS: Record<string, number> = {
+  "💩": 3200,
+  "💀": 4200,
+  "🌈": 2700,
+};
+const DEFAULT_LIFETIME_MS = 3200;
 const COMBO_LIFETIME_MS = 4000;
 const COMBO_WINDOW_MS = 2500;
 const COMBO_COOLDOWN_MS = 5000;
 const COMBO_MIN_PLAYERS = 3;
+
+/**
+ * Hard ceiling on simultaneous on-screen reactions. Each 💩 expands into 13
+ * animated nodes and each 💀 into 7, so an uncapped queue is what actually
+ * melts a phone when everyone spams at once. Oldest are dropped first.
+ */
+const MAX_FLOATING_DESKTOP = 24;
+const MAX_FLOATING_MOBILE = 10;
+
+/** Phones get fewer particles per reaction; desktop keeps the original look. */
+function isLowPowerDevice(): boolean {
+  if (typeof window === "undefined") return false;
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+  const cores = navigator.hardwareConcurrency ?? 8;
+  return window.matchMedia("(max-width: 640px)").matches || cores <= 4;
+}
 
 function makeReaction(emoji: string, id: string): Reaction {
   return {
@@ -57,7 +92,17 @@ function makeReaction(emoji: string, id: string): Reaction {
 // ── Per-emoji renderers ──────────────────────────────────────
 
 /** 💩 Poop Burst: appears, then splits into smaller poops 3 times */
-function PoopBurst({ x, y, seed }: { x: number; y: number; seed: number }) {
+const PoopBurst = memo(function PoopBurst({
+  x,
+  y,
+  seed,
+  lite,
+}: {
+  x: number;
+  y: number;
+  seed: number;
+  lite: boolean;
+}) {
   // Generation 0: 1 big poop
   // Generation 1: 3 medium poops burst outward
   // Generation 2: 9 small poops burst further
@@ -66,7 +111,7 @@ function PoopBurst({ x, y, seed }: { x: number; y: number; seed: number }) {
     80 + seed * 30,
     200 + seed * 25,
   ];
-  const gen2Offsets = [
+  const allGen2Offsets = [
     { dx: -20, dy: -15 },
     { dx: 15, dy: -25 },
     { dx: 25, dy: 5 },
@@ -77,6 +122,7 @@ function PoopBurst({ x, y, seed }: { x: number; y: number; seed: number }) {
     { dx: -25, dy: -30 },
     { dx: 20, dy: 15 },
   ];
+  const gen2Offsets = lite ? allGen2Offsets.slice(0, 3) : allGen2Offsets;
 
   return (
     <div
@@ -132,11 +178,23 @@ function PoopBurst({ x, y, seed }: { x: number; y: number; seed: number }) {
       })}
     </div>
   );
-}
+});
 
 /** 💀 Skull: floats up with a ghostly wobble, spawns bone particles */
-function SkullHaunt({ x, y, seed }: { x: number; y: number; seed: number }) {
-  const boneEmojis = ["🦴", "👻", "🦴", "👻", "🦴", "💀"];
+const SkullHaunt = memo(function SkullHaunt({
+  x,
+  y,
+  seed,
+  lite,
+}: {
+  x: number;
+  y: number;
+  seed: number;
+  lite: boolean;
+}) {
+  const boneEmojis = lite
+    ? ["🦴", "👻", "💀"]
+    : ["🦴", "👻", "🦴", "👻", "🦴", "💀"];
   return (
     <div
       className="absolute"
@@ -169,10 +227,16 @@ function SkullHaunt({ x, y, seed }: { x: number; y: number; seed: number }) {
       })}
     </div>
   );
-}
+});
 
 /** 🌈 Rainbow: a short rainbow shooting star that arcs across the screen */
-function RainbowFly({ y, seed }: { y: number; seed: number }) {
+const RainbowFly = memo(function RainbowFly({
+  y,
+  seed,
+}: {
+  y: number;
+  seed: number;
+}) {
   const bottomPct = 15 + y + seed * 35;
   const fromLeft = seed > 0.5;
   const arcCurve = 70 + seed * 80; // how much it curves upward
@@ -223,25 +287,27 @@ function RainbowFly({ y, seed }: { y: number; seed: number }) {
       </svg>
     </div>
   );
-}
+});
 
 /** ✨ Combo Burst: a giant emoji explosion in center-screen with shockwave rings */
-function ComboBurst({
+const ComboBurst = memo(function ComboBurst({
   emoji,
   count,
   seed,
+  lite,
 }: {
   emoji: string;
   count: number;
   seed: number;
+  lite: boolean;
 }) {
-  const particleCount = 14;
+  const particleCount = lite ? 6 : 14;
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       {/* Shockwave rings */}
       <div className="combo-ring combo-ring-1" />
-      <div className="combo-ring combo-ring-2" />
-      <div className="combo-ring combo-ring-3" />
+      {!lite && <div className="combo-ring combo-ring-2" />}
+      {!lite && <div className="combo-ring combo-ring-3" />}
 
       {/* Burst particles flying outward */}
       {Array.from({ length: particleCount }).map((_, i) => {
@@ -276,7 +342,7 @@ function ComboBurst({
       </div>
     </div>
   );
-}
+});
 
 // ── Main component ───────────────────────────────────────────
 
@@ -288,13 +354,19 @@ export default function EmojiReactions({
   sessionId: string;
 }) {
   const sendReaction = useMutation(api.games.sendReaction);
-  const reactions = useQuery(api.games.getReactions, { gameId, sessionId });
+  // No sessionId here on purpose — see getReactions: identical args across
+  // players means one shared subscription instead of one query run per player.
+  const reactions = useQuery(api.games.getReactions, { gameId });
   const myPlayer = useQuery(api.games.getMyPlayer, { gameId, sessionId });
   const [floating, setFloating] = useState<Reaction[]>([]);
   const [combos, setCombos] = useState<Combo[]>([]);
   const seenIds = useRef(new Set<string>());
   const initialLoadRef = useRef(true);
   const localIdCounter = useRef(0);
+
+  const [lite, setLite] = useState(false);
+  const maxFloating = lite ? MAX_FLOATING_MOBILE : MAX_FLOATING_DESKTOP;
+  useEffect(() => setLite(isLowPowerDevice()), []);
 
   // Combo detection state
   const trackedRef = useRef<{ playerId: string; emoji: string; ts: number }[]>([]);
@@ -326,10 +398,12 @@ export default function EmojiReactions({
       if (now - last < COMBO_COOLDOWN_MS) continue;
       lastComboAtRef.current[emoji] = now;
       const id = `combo-${now}-${emoji}`;
-      setCombos((prev) => [
-        ...prev,
-        { id, emoji, count: entry.total, seed: Math.random(), createdAt: now },
-      ]);
+      setCombos((prev) =>
+        [
+          ...prev,
+          { id, emoji, count: entry.total, seed: Math.random(), createdAt: now },
+        ].slice(lite ? -1 : -2)
+      );
       const sound = EMOJI_SOUNDS[emoji];
       if (sound) {
         sound();
@@ -337,19 +411,25 @@ export default function EmojiReactions({
         setTimeout(sound, 260);
       }
     }
-  }, []);
+  }, [lite]);
 
   useEffect(() => {
     if (!reactions) return;
+    // Wait for our own player id before ingesting: without it we can't tell
+    // our echoed-back reactions from everyone else's and would double-render.
+    if (myPlayer === undefined) return;
     if (initialLoadRef.current) {
       initialLoadRef.current = false;
       for (const r of reactions) seenIds.current.add(r._id);
       return;
     }
+    const myId = myPlayer?._id;
     const newReactions: Reaction[] = [];
     for (const r of reactions) {
       if (seenIds.current.has(r._id)) continue;
       seenIds.current.add(r._id);
+      // Our own reactions are already on screen from handleSend.
+      if (myId && r.playerId === myId) continue;
       newReactions.push(makeReaction(r.emoji, r._id));
       trackedRef.current.push({
         playerId: r.playerId,
@@ -357,35 +437,52 @@ export default function EmojiReactions({
         ts: Date.now(),
       });
     }
+    // The server only returns a short window, so anything not currently in it
+    // can never arrive again — safe to forget.
+    if (seenIds.current.size > 500) {
+      seenIds.current = new Set(reactions.map((r) => r._id));
+    }
     if (newReactions.length > 0) {
-      const sound = EMOJI_SOUNDS[newReactions[0].emoji];
-      if (sound) sound();
-      setFloating((prev) => [...prev, ...newReactions]);
+      playReactionSound(newReactions[0].emoji);
+      setFloating((prev) => [...prev, ...newReactions].slice(-maxFloating));
       checkCombo();
     }
-  }, [reactions, checkCombo]);
+  }, [reactions, checkCombo, myPlayer, maxFloating]);
 
   useEffect(() => {
     const interval = setInterval(() => {
       const now = Date.now();
-      setFloating((prev) => prev.filter((r) => now - r.createdAt < MAX_LIFETIME_MS));
-      setCombos((prev) => prev.filter((c) => now - c.createdAt < COMBO_LIFETIME_MS));
-    }, 1500);
+      // Return the previous array unchanged when nothing expired: otherwise
+      // this tick re-renders every live reaction once a second for no reason.
+      setFloating((prev) => {
+        const next = prev.filter(
+          (r) =>
+            now - r.createdAt <
+            (LIFETIME_MS[r.emoji] ?? DEFAULT_LIFETIME_MS)
+        );
+        return next.length === prev.length ? prev : next;
+      });
+      setCombos((prev) => {
+        const next = prev.filter((c) => now - c.createdAt < COMBO_LIFETIME_MS);
+        return next.length === prev.length ? prev : next;
+      });
+    }, 1000);
     return () => clearInterval(interval);
   }, []);
 
   const handleSend = useCallback(
     (emoji: string) => {
       const localId = `local-${Date.now()}-${++localIdCounter.current}`;
-      const sound = EMOJI_SOUNDS[emoji];
-      if (sound) sound();
-      setFloating((prev) => [...prev, makeReaction(emoji, localId)]);
+      playReactionSound(emoji);
+      setFloating((prev) =>
+        [...prev, makeReaction(emoji, localId)].slice(-maxFloating)
+      );
       const myId = myPlayerIdRef.current ?? `me-${sessionId}`;
       trackedRef.current.push({ playerId: myId, emoji, ts: Date.now() });
       checkCombo();
       sendReaction({ gameId, sessionId, emoji });
     },
-    [gameId, sessionId, sendReaction, checkCombo]
+    [gameId, sessionId, sendReaction, checkCombo, maxFloating]
   );
 
   return (
@@ -461,11 +558,13 @@ export default function EmojiReactions({
         /* The dash trick: dasharray = [visible length, gap].
            Animate dashoffset from full-length to negative to make it
            appear to shoot across then vanish like a comet tail. */
+        /* No blur filter here: stroke-dashoffset already forces a repaint of
+           this full-width path every frame, and filtering that repaint was
+           the single most expensive reaction effect on phones. */
         .rainbow-shoot-right, .rainbow-shoot-left {
           stroke-dasharray: 200 1200;
           stroke-dashoffset: 1200;
           animation: rainbow-shoot 2.5s cubic-bezier(0.2, 0.6, 0.3, 1) forwards;
-          filter: blur(0.4px);
         }
         @keyframes rainbow-shoot {
           0% { stroke-dashoffset: 1200; opacity: 0; }
@@ -520,19 +619,28 @@ export default function EmojiReactions({
           width: 120px;
           height: 120px;
           opacity: 0;
+          will-change: transform, opacity;
         }
         .combo-ring-1 { color: #E8553A; animation: combo-ring-expand 1.6s ease-out forwards; }
         .combo-ring-2 { color: #2A9D8F; animation: combo-ring-expand 1.8s ease-out 0.18s forwards; }
         .combo-ring-3 { color: #FFD23F; animation: combo-ring-expand 2.0s ease-out 0.36s forwards; }
+        /* transform + opacity only — animating border-width forced a layout
+           and repaint of a ~1000px circle on every frame. */
         @keyframes combo-ring-expand {
-          0% { transform: scale(0); opacity: 0.85; border-width: 6px; }
-          100% { transform: scale(9); opacity: 0; border-width: 1px; }
+          0% { transform: scale(0); opacity: 0.85; }
+          100% { transform: scale(9); opacity: 0; }
         }
 
         .combo-particle {
           animation: combo-particle-burst 2.5s ease-out forwards;
           opacity: 0;
         }
+        /* Infinite wobble/shake are the only always-running animations here;
+           drop them (and the heavy per-particle work) for reduced-motion. */
+        @media (prefers-reduced-motion: reduce) {
+          .combo-mega-emoji, .combo-label { animation: none; }
+        }
+
         @keyframes combo-particle-burst {
           0% { transform: translate(0, 0) scale(0) rotate(0deg); opacity: 0; }
           15% { transform: translate(calc(var(--tx) * 0.3), calc(var(--ty) * 0.3)) scale(1.2) rotate(120deg); opacity: 1; }
@@ -545,10 +653,14 @@ export default function EmojiReactions({
       <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
         {floating.map((r) => {
           if (r.emoji === "💩") {
-            return <PoopBurst key={r.id} x={r.x} y={r.y} seed={r.seed} />;
+            return (
+              <PoopBurst key={r.id} x={r.x} y={r.y} seed={r.seed} lite={lite} />
+            );
           }
           if (r.emoji === "💀") {
-            return <SkullHaunt key={r.id} x={r.x} y={r.y} seed={r.seed} />;
+            return (
+              <SkullHaunt key={r.id} x={r.x} y={r.y} seed={r.seed} lite={lite} />
+            );
           }
           if (r.emoji === "🌈") {
             return <RainbowFly key={r.id} y={r.y} seed={r.seed} />;
@@ -558,7 +670,13 @@ export default function EmojiReactions({
 
         {/* Combo bursts — center-screen mega celebrations */}
         {combos.map((c) => (
-          <ComboBurst key={c.id} emoji={c.emoji} count={c.count} seed={c.seed} />
+          <ComboBurst
+            key={c.id}
+            emoji={c.emoji}
+            count={c.count}
+            seed={c.seed}
+            lite={lite}
+          />
         ))}
       </div>
 
