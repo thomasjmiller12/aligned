@@ -32,6 +32,7 @@ export default function PlayerBar({
         const isClueGiver = currentRound?.clueGiverId === player._id;
         const isMe = player.sessionId === sessionId;
         const score = playerScores?.[player._id] ?? 0;
+        const disconnected = !player.isConnected;
 
         return (
           <motion.div
@@ -43,24 +44,21 @@ export default function PlayerBar({
           >
             <div className="relative">
               <div
-                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white transition-all ${
-                  isClueGiver ? "ring-2 ring-offset-2" : ""
-                } ${!player.isConnected || player.isSpectator ? "opacity-40" : ""}`}
-                style={{
-                  backgroundColor: player.color,
-                  ...(isClueGiver
-                    ? ({ "--tw-ring-color": player.color } as React.CSSProperties)
-                    : {}),
-                }}
+                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-foam transition-all ${
+                  isClueGiver ? "ring-2 ring-sun ring-offset-2 ring-offset-deep" : ""
+                } ${disconnected ? "ring-2 ring-silt/60 ring-offset-2 ring-offset-deep" : ""} ${
+                  disconnected || player.isSpectator ? "opacity-40" : ""
+                }`}
+                style={{ backgroundColor: player.color }}
               >
                 {player.name.charAt(0).toUpperCase()}
               </div>
               {player.isSpectator ? (
-                <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white shadow-sm">
-                  <Eye className="h-3 w-3 text-text-secondary" />
+                <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-abyss ring-1 ring-caustic/20">
+                  <Eye className="h-3 w-3 text-silt" />
                 </div>
               ) : showScores ? (
-                <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold shadow-sm"
+                <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-abyss text-[10px] font-bold ring-1 ring-caustic/20"
                   style={{ color: player.color }}
                 >
                   {score}
@@ -68,7 +66,7 @@ export default function PlayerBar({
               ) : null}
             </div>
             <span
-              className={`text-xs ${isMe ? "font-bold text-text" : "text-text-secondary"}`}
+              className={`text-xs ${isMe ? "font-bold text-foam" : "text-silt"}`}
             >
               {isMe ? "You" : player.name.split(" ")[0]}
             </span>

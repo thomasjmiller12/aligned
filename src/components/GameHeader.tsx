@@ -4,6 +4,7 @@ import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Copy, Check, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSound } from "@/hooks/useSound";
+import { Button } from "@/components/ui/Button";
 
 interface GameHeaderProps {
   code: string;
@@ -49,45 +50,48 @@ export default function GameHeader({
   const showRounds = status !== "lobby" && status !== "game_over";
 
   return (
-    <header className="grid grid-cols-3 items-center px-4 py-3">
+    <header className="relative grid grid-cols-3 items-center bg-abyss/30 px-4 py-3">
       {/* Game Code + Sound — left */}
-      <div className="flex items-center gap-2 justify-start">
-        <button
+      <div className="flex items-center gap-1 justify-start">
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={copyCode}
-          className="flex items-center gap-2 rounded-lg bg-white/70 backdrop-blur-sm border border-white/50 px-3 py-1.5 text-sm font-bold tracking-widest shadow-sm transition-all hover:shadow-md"
+          className="gap-2 font-title tracking-widest text-silt hover:text-foam"
         >
           {code}
           {copied ? (
             <Check className="h-3.5 w-3.5 text-success" />
           ) : (
-            <Copy className="h-3.5 w-3.5 text-text-secondary" />
+            <Copy className="h-3.5 w-3.5 text-silt" />
           )}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={toggleMute}
-          className="flex items-center justify-center rounded-lg bg-white/70 backdrop-blur-sm border border-white/50 p-1.5 shadow-sm transition-all hover:shadow-md"
           aria-label={isMuted ? "Unmute sounds" : "Mute sounds"}
         >
           {isMuted ? (
-            <VolumeX className="h-3.5 w-3.5 text-text-secondary" />
+            <VolumeX className="h-3.5 w-3.5" />
           ) : (
-            <Volume2 className="h-3.5 w-3.5 text-text-secondary" />
+            <Volume2 className="h-3.5 w-3.5" />
           )}
-        </button>
+        </Button>
       </div>
 
       {/* Team Score — center */}
       <div className="flex justify-center">
         {showScore && (
           <div className="text-center">
-            <div className="text-xs font-medium uppercase tracking-wider text-text-secondary">
+            <div className="text-xs font-medium uppercase tracking-wider text-silt">
               Team Score
             </div>
             <motion.div
               key={teamScore}
               initial={{ scale: 1.3 }}
               animate={{ scale: 1 }}
-              className="text-2xl font-bold text-primary tabular-nums"
+              className="lit font-title text-2xl font-bold text-foam tabular-nums"
             >
               {displayScore}
             </motion.div>
@@ -104,16 +108,18 @@ export default function GameHeader({
                 key={i}
                 className={`h-2 w-2 rounded-full transition-colors ${
                   i < currentRound
-                    ? "bg-success"
+                    ? "bg-caustic"
                     : i === currentRound
-                      ? "bg-primary"
-                      : "bg-gray-200"
+                      ? "bg-transparent ring-2 ring-caustic shadow-[0_0_6px_rgba(111,224,210,0.55)]"
+                      : "bg-shoal"
                 }`}
               />
             ))}
           </div>
         )}
       </div>
+
+      <div className="rule-caustic absolute inset-x-0 bottom-0" />
     </header>
   );
 }

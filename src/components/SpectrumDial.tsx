@@ -95,14 +95,14 @@ const AnimatedArrow = memo(function AnimatedArrow({
         transition={{ type: "spring", stiffness: 120, damping: 20 }}
         r={11}
         fill={arrow.color}
-        stroke="white"
+        stroke="#06182A"
         strokeWidth={2}
       />
       <motion.text
         animate={{ x: dotPos.x, y: dotPos.y + 4 }}
         transition={{ type: "spring", stiffness: 120, damping: 20 }}
         textAnchor="middle"
-        fill="white"
+        fill="#E8F5F3"
         fontSize={11}
         fontWeight="bold"
       >
@@ -121,7 +121,7 @@ const AnimatedArrow = memo(function AnimatedArrow({
             y={dotPos.y - 16 + scoreYOffset}
             textAnchor="middle"
             fill={scored
-              ? (score === 4 ? "#FBBF24" : score === 3 ? "#2DD4BF" : "#A7F3D0")
+              ? (score === 4 ? "#FFDFA3" : score === 3 ? "#6FE0D2" : "#58D9A6")
               : "#999"
             }
             fontSize={scored ? 13 : 11}
@@ -311,7 +311,7 @@ export default function SpectrumDial({
   );
 
   const isFreeDragging = isDragging && dragPos !== null;
-  const lockedColor = myColor ?? "#4CAF50";
+  const lockedColor = myColor ?? "#58D9A6";
 
   const arcStart = posOnArc(0, RADIUS);
   const arcEnd = posOnArc(180, RADIUS);
@@ -325,7 +325,7 @@ export default function SpectrumDial({
       <svg
         ref={svgRef}
         viewBox={`0 ${VB_Y_OFFSET} ${SIZE} ${VB_HEIGHT}`}
-        className="w-full max-w-[420px] touch-none select-none rounded-3xl focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
+        className="w-full max-w-[420px] touch-none select-none rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-caustic/70 focus-visible:ring-offset-2 focus-visible:ring-offset-deep"
         style={{ overflow: "visible" }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -347,13 +347,19 @@ export default function SpectrumDial({
       >
         <defs>
           <radialGradient id="bgGlow" cx="50%" cy="100%" r="80%" fx="50%" fy="100%">
-            <stop offset="0%" stopColor="#F5E6D3" stopOpacity={0.4} />
-            <stop offset="60%" stopColor="#FFF8F0" stopOpacity={0.25} />
-            <stop offset="100%" stopColor="#FFF8F0" stopOpacity={0.08} />
+            <stop offset="0%" stopColor="#6FE0D2" stopOpacity={0.16} />
+            <stop offset="55%" stopColor="#14495A" stopOpacity={0.3} />
+            <stop offset="100%" stopColor="#06182A" stopOpacity={0.42} />
           </radialGradient>
+          {/* Light entering from the surface — used by the reveal shaft */}
+          <linearGradient id="surfaceShaft" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#FFDFA3" stopOpacity={0} />
+            <stop offset="45%" stopColor="#FFDFA3" stopOpacity={0.1} />
+            <stop offset="100%" stopColor="#6FE0D2" stopOpacity={0.4} />
+          </linearGradient>
         </defs>
 
-        {/* Subtle warm cream gradient fill across semicircle */}
+        {/* The dial face reads as a lit well in the water */}
         <path d={bgArcPath} fill="url(#bgGlow)" />
 
         {/* Tick marks */}
@@ -369,17 +375,18 @@ export default function SpectrumDial({
               y1={outer.y}
               x2={inner.x}
               y2={inner.y}
-              stroke={isMajor ? "#BBB" : "#DDD"}
+              stroke={isMajor ? "#6FE0D2" : "#8FB2BC"}
+              strokeOpacity={isMajor ? 0.5 : 0.22}
               strokeWidth={isMajor ? 1.5 : 0.75}
             />
           );
         })}
 
-        {/* Main arc — neutral tone, scoring zones are the visual focus */}
+        {/* Main arc — quiet, so the scoring zones and the needle carry focus */}
         <path
           d={arcPath}
           fill="none"
-          stroke="#D4C4B0"
+          stroke="#14495A"
           strokeWidth={10}
           strokeLinecap="round"
           opacity={0.5}
@@ -396,7 +403,7 @@ export default function SpectrumDial({
             <path
               d={glowPath}
               fill="none"
-              stroke="#E8553A"
+              stroke="#6FE0D2"
               strokeWidth={14}
               strokeLinecap="round"
               opacity={0.15}
@@ -415,11 +422,11 @@ export default function SpectrumDial({
           const C = SCORE_ZONES.CLOSE;
           const N = SCORE_ZONES.NEAR;
           const zones = [
-            { from: -B, to: B, color: "#FBBF24", opacity: 1, delay: 0.1 },
-            { from: -C, to: -B, color: "#2DD4BF", opacity: 1, delay: 0.22 },
-            { from: B, to: C, color: "#2DD4BF", opacity: 1, delay: 0.22 },
-            { from: -N, to: -C, color: "#A7F3D0", opacity: 1, delay: 0.34 },
-            { from: C, to: N, color: "#A7F3D0", opacity: 1, delay: 0.34 },
+            { from: -B, to: B, color: "#FFDFA3", opacity: 1, delay: 0.1 },
+            { from: -C, to: -B, color: "#6FE0D2", opacity: 1, delay: 0.22 },
+            { from: B, to: C, color: "#6FE0D2", opacity: 1, delay: 0.22 },
+            { from: -N, to: -C, color: "#58D9A6", opacity: 1, delay: 0.34 },
+            { from: C, to: N, color: "#58D9A6", opacity: 1, delay: 0.34 },
           ];
           function bandPath(fromDeg: number, toDeg: number) {
             const s = Math.max(0, tp + fromDeg);
@@ -460,7 +467,7 @@ export default function SpectrumDial({
               y1={CENTER_Y}
               x2={posOnArc(targetPosition, RADIUS + 8).x}
               y2={posOnArc(targetPosition, RADIUS + 8).y}
-              stroke="#E8553A"
+              stroke="#6FE0D2"
               strokeWidth={3}
               strokeDasharray="6 4"
               strokeLinecap="round"
@@ -469,12 +476,42 @@ export default function SpectrumDial({
               cx={posOnArc(targetPosition, RADIUS + 14).x}
               cy={posOnArc(targetPosition, RADIUS + 14).y}
               r={7}
-              fill="#E8553A"
-              stroke="white"
+              fill="#6FE0D2"
+              stroke="#06182A"
               strokeWidth={2}
             />
           </motion.g>
         )}
+
+        {/* Reveal: light breaks the surface and lands on the target.
+            Also the only unambiguous "X marks the spot" during reveal — the
+            dashed clue-phase marker above is hidden once the wedge is shown. */}
+        {hasTarget && showScoringWedge && (() => {
+          const tip = posOnArc(targetPosition, RADIUS);
+          const top = VB_Y_OFFSET;
+          const spread = 30;
+          return (
+            <motion.g
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.42, duration: 0.75, ease: "easeOut" }}
+            >
+              <path
+                d={`M ${tip.x - spread} ${top} L ${tip.x + spread} ${top} L ${tip.x + 4} ${tip.y} L ${tip.x - 4} ${tip.y} Z`}
+                fill="url(#surfaceShaft)"
+              />
+              <circle cx={tip.x} cy={tip.y} r={11} fill="#FFDFA3" opacity={0.18} />
+              <circle
+                cx={tip.x}
+                cy={tip.y}
+                r={4.5}
+                fill="#FFDFA3"
+                stroke="#06182A"
+                strokeWidth={1.5}
+              />
+            </motion.g>
+          );
+        })()}
 
         {/* Player arrows — compute Y offsets to prevent overlapping score labels */}
         {(() => {
@@ -518,7 +555,7 @@ export default function SpectrumDial({
                   cx={arcTip.x}
                   cy={arcTip.y}
                   r={6}
-                  fill={lockedIn ? lockedColor : "#2D2D2D"}
+                  fill={lockedIn ? lockedColor : "#E8F5F3"}
                   opacity={0.25}
                 />
               )}
@@ -531,7 +568,7 @@ export default function SpectrumDial({
                   y1={CENTER_Y}
                   x2={dragPos!.x}
                   y2={dragPos!.y}
-                  stroke={lockedIn ? lockedColor : "#2D2D2D"}
+                  stroke={lockedIn ? lockedColor : "#E8F5F3"}
                   strokeWidth={2}
                   strokeDasharray="4 4"
                   opacity={0.2}
@@ -544,7 +581,7 @@ export default function SpectrumDial({
                   y1={CENTER_Y}
                   animate={{ x2: arcTip.x, y2: arcTip.y }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  stroke={lockedIn ? lockedColor : "#2D2D2D"}
+                  stroke={lockedIn ? lockedColor : "#E8F5F3"}
                   strokeWidth={4}
                   strokeLinecap="round"
                 />
@@ -563,9 +600,9 @@ export default function SpectrumDial({
                     : { type: "spring", stiffness: 300, damping: 20 }
                 }
                 fill={
-                  lockedIn ? lockedColor : isFreeDragging ? "#E8553A" : "#2D2D2D"
+                  lockedIn ? lockedColor : isFreeDragging ? "#6FE0D2" : "#E8F5F3"
                 }
-                stroke="white"
+                stroke="#06182A"
                 strokeWidth={3}
                 style={{
                   filter: isFreeDragging
@@ -583,7 +620,7 @@ export default function SpectrumDial({
                   y1={CENTER_Y}
                   x2={arcTip.x}
                   y2={arcTip.y}
-                  stroke={lockedIn ? lockedColor : "#2D2D2D"}
+                  stroke={lockedIn ? lockedColor : "#E8F5F3"}
                   strokeWidth={2}
                   opacity={0.12}
                   strokeLinecap="round"
@@ -599,7 +636,7 @@ export default function SpectrumDial({
                   animate={{ r: 24, opacity: 0 }}
                   transition={{ duration: 0.4, ease: "easeOut" }}
                   fill="none"
-                  stroke={lockedIn ? lockedColor : "#E8553A"}
+                  stroke={lockedIn ? lockedColor : "#6FE0D2"}
                   strokeWidth={2}
                 />
               )}
@@ -608,20 +645,20 @@ export default function SpectrumDial({
         })()}
 
         {/* Center dot */}
-        <circle cx={CENTER_X} cy={CENTER_Y} r={5} fill="#DDD" />
-        <circle cx={CENTER_X} cy={CENTER_Y} r={2} fill="#BBB" />
+        <circle cx={CENTER_X} cy={CENTER_Y} r={5} fill="#14495A" />
+        <circle cx={CENTER_X} cy={CENTER_Y} r={2} fill="#6FE0D2" fillOpacity={0.7} />
       </svg>
 
       {/* Labels */}
       <div className="-mt-3 flex w-full max-w-[420px] justify-between gap-2 px-1">
         <span
-          className="block max-w-[40%] truncate text-sm font-semibold text-text-secondary"
+          className="block max-w-[40%] truncate text-sm font-medium tracking-wide text-silt"
           title={leftLabel}
         >
           {leftLabel}
         </span>
         <span
-          className="block max-w-[40%] truncate text-right text-sm font-semibold text-text-secondary"
+          className="block max-w-[40%] truncate text-right text-sm font-medium tracking-wide text-silt"
           title={rightLabel}
         >
           {rightLabel}

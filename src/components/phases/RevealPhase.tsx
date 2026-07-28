@@ -9,6 +9,7 @@ import { motion } from "framer-motion";
 import { ArrowRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { playScoreReveal } from "@/lib/sounds";
+import { Button } from "@/components/ui/Button";
 
 interface RevealPhaseProps {
   game: Doc<"games">;
@@ -71,10 +72,10 @@ export default function RevealPhase({
     <div className="space-y-2 text-center">
       {/* Clue reminder */}
       <div>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-silt">
           {clueGiver?.name}&apos;s clue:
         </p>
-        <h2 className="text-2xl font-bold text-primary">
+        <h2 className="mt-1 font-title text-2xl font-semibold text-foam">
           {round.clue || "..."}
         </h2>
       </div>
@@ -93,9 +94,9 @@ export default function RevealPhase({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="glass-card rounded-2xl p-5 shadow-sm"
+        className="panel rounded-2xl p-5"
       >
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-secondary">
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-silt">
           Round Scores
         </h3>
         <div className="space-y-2">
@@ -105,14 +106,14 @@ export default function RevealPhase({
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.6 + i * 0.1 }}
-              className="flex items-center justify-between rounded-lg bg-cream px-3 py-2"
+              className="flex items-center justify-between rounded-xl bg-foam/5 px-3 py-2 tabular-nums"
             >
               <div className="flex items-center gap-2">
                 <div
-                  className="h-6 w-6 rounded-full"
+                  className="h-2.5 w-2.5 rounded-full"
                   style={{ backgroundColor: s.color }}
                 />
-                <span className="font-medium">{s.name}</span>
+                <span className="font-medium text-foam">{s.name}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span
@@ -136,10 +137,14 @@ export default function RevealPhase({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.0 }}
-          className="mt-3 border-t pt-3 text-right"
         >
-          <span className="text-sm text-text-secondary">Round total: </span>
-          <span className="text-xl font-bold text-primary">+{roundTotal}</span>
+          <div className="rule-caustic mt-3" />
+          <div className="pt-3 text-right">
+            <span className="text-sm text-silt">Round total: </span>
+            <span className="lit-warm font-title text-3xl font-semibold text-sun tabular-nums">
+              +{roundTotal}
+            </span>
+          </div>
         </motion.div>
       </motion.div>
 
@@ -150,7 +155,10 @@ export default function RevealPhase({
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
         >
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={async () => {
               if (advancing) return;
               setAdvancing(true);
@@ -161,18 +169,17 @@ export default function RevealPhase({
               }
             }}
             disabled={advancing}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
           >
             {advancing ? "Loading..." : "Next Round"}
             {!advancing && <ArrowRight className="h-5 w-5" />}
-          </button>
+          </Button>
         </motion.div>
       ) : (
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.2 }}
-          className="text-sm text-text-secondary"
+          className="text-sm text-silt"
         >
           Waiting for host to continue...
         </motion.p>

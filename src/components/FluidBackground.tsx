@@ -173,7 +173,7 @@ const LAVA_BLOBS: Array<{
   phase: number;
 }> = [
   {
-    color: [232, 85, 58], baseOpacity: 0.28, baseRadius: 420,
+    color: [111, 224, 210], baseOpacity: 0.20, baseRadius: 420,
     x: 0.25, y: 0.3,
     freqX1: 0.08, freqY1: 0.06, freqX2: 0.03, freqY2: 0.05,
     ampX1: 0.18, ampY1: 0.15, ampX2: 0.1, ampY2: 0.08,
@@ -181,7 +181,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.1, opacityAmp: 0.4, phase: 0,
   },
   {
-    color: [42, 157, 143], baseOpacity: 0.25, baseRadius: 400,
+    color: [86, 196, 208], baseOpacity: 0.18, baseRadius: 400,
     x: 0.7, y: 0.6,
     freqX1: 0.07, freqY1: 0.09, freqX2: 0.04, freqY2: 0.02,
     ampX1: 0.2, ampY1: 0.18, ampX2: 0.08, ampY2: 0.1,
@@ -189,7 +189,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.08, opacityAmp: 0.45, phase: 1.2,
   },
   {
-    color: [244, 162, 97], baseOpacity: 0.22, baseRadius: 350,
+    color: [255, 223, 163], baseOpacity: 0.14, baseRadius: 350,
     x: 0.5, y: 0.2,
     freqX1: 0.1, freqY1: 0.07, freqX2: 0.05, freqY2: 0.04,
     ampX1: 0.22, ampY1: 0.18, ampX2: 0.12, ampY2: 0.08,
@@ -197,7 +197,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.13, opacityAmp: 0.35, phase: 2.5,
   },
   {
-    color: [220, 100, 50], baseOpacity: 0.2, baseRadius: 280,
+    color: [64, 168, 180], baseOpacity: 0.16, baseRadius: 280,
     x: 0.15, y: 0.7,
     freqX1: 0.12, freqY1: 0.1, freqX2: 0.06, freqY2: 0.08,
     ampX1: 0.25, ampY1: 0.2, ampX2: 0.14, ampY2: 0.1,
@@ -205,7 +205,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.15, opacityAmp: 0.5, phase: 3.8,
   },
   {
-    color: [30, 140, 130], baseOpacity: 0.2, baseRadius: 330,
+    color: [40, 120, 150], baseOpacity: 0.16, baseRadius: 330,
     x: 0.8, y: 0.25,
     freqX1: 0.06, freqY1: 0.11, freqX2: 0.03, freqY2: 0.07,
     ampX1: 0.15, ampY1: 0.22, ampX2: 0.1, ampY2: 0.14,
@@ -213,7 +213,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.11, opacityAmp: 0.42, phase: 5.0,
   },
   {
-    color: [255, 200, 160], baseOpacity: 0.18, baseRadius: 500,
+    color: [255, 232, 196], baseOpacity: 0.11, baseRadius: 500,
     x: 0.4, y: 0.8,
     freqX1: 0.05, freqY1: 0.04, freqX2: 0.02, freqY2: 0.03,
     ampX1: 0.18, ampY1: 0.12, ampX2: 0.08, ampY2: 0.06,
@@ -221,7 +221,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.06, opacityAmp: 0.35, phase: 0.7,
   },
   {
-    color: [50, 180, 165], baseOpacity: 0.18, baseRadius: 250,
+    color: [120, 232, 214], baseOpacity: 0.14, baseRadius: 250,
     x: 0.6, y: 0.45,
     freqX1: 0.14, freqY1: 0.09, freqX2: 0.07, freqY2: 0.05,
     ampX1: 0.22, ampY1: 0.18, ampX2: 0.12, ampY2: 0.1,
@@ -229,7 +229,7 @@ const LAVA_BLOBS: Array<{
     opacityFreq: 0.16, opacityAmp: 0.45, phase: 4.2,
   },
   {
-    color: [200, 60, 40], baseOpacity: 0.14, baseRadius: 550,
+    color: [24, 80, 120], baseOpacity: 0.16, baseRadius: 550,
     x: 0.35, y: 0.5,
     freqX1: 0.04, freqY1: 0.03, freqX2: 0.02, freqY2: 0.015,
     ampX1: 0.12, ampY1: 0.1, ampX2: 0.06, ampY2: 0.05,
@@ -1504,7 +1504,7 @@ export default function FluidBackground({
   remotePresence = [],
   onLocalMove,
   onLocalBurst,
-  playerColor = "#E8553A",
+  playerColor = "#6FE0D2",
   interactive = true,
   getExternalPointerPos,
 }: FluidBackgroundProps) {
@@ -1698,8 +1698,15 @@ export default function FluidBackground({
 
     function handleTouchStart(e: TouchEvent) {
       const target = e.target as Element;
+      // If the page itself overflows, scrolling always wins — being unable to
+      // scroll is far worse than losing drag-through-the-pond on that screen.
+      // Pull-to-refresh is already handled by overscroll-behavior-y on <html>,
+      // and the dial guards its own drag with touch-action: none.
+      const root = document.documentElement;
+      const pageScrolls = root.scrollHeight > root.clientHeight + 1;
       suppressTouchScroll =
         interactiveRef.current &&
+        !pageScrolls &&
         !isUIElement(target) &&
         !hasScrollableAncestor(target);
     }

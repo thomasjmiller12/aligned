@@ -9,6 +9,7 @@ import SpectrumDial from "../SpectrumDial";
 import { motion } from "framer-motion";
 import { Check, Clock } from "lucide-react";
 import { playClueSubmitted } from "@/lib/sounds";
+import { Button } from "@/components/ui/Button";
 
 interface CluePhaseProps {
   game: Doc<"games">;
@@ -87,8 +88,8 @@ export default function CluePhase({
         totalSeconds={game.settings.clueTimerSeconds}
       />
 
-      <h2 className="text-xl font-bold">Give Your Clue</h2>
-      <p className="text-sm text-text-secondary">
+      <h2 className="font-title text-xl font-bold text-sun">Give Your Clue</h2>
+      <p className="text-sm text-silt">
         Everyone writes a clue for their spectrum at the same time
       </p>
 
@@ -109,20 +110,22 @@ export default function CluePhase({
                 onChange={(e) => setClueText(e.target.value)}
                 maxLength={250}
                 autoFocus
-                className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-center text-xl font-semibold outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="w-full rounded-xl border border-caustic/25 bg-abyss/50 px-6 py-5 text-center text-2xl font-semibold text-foam outline-none placeholder:text-silt/70 transition-colors focus:border-caustic focus:ring-2 focus:ring-caustic/40"
                 onKeyDown={(e) => e.key === "Enter" && handleSubmitClue()}
               />
-              <button
+              <Button
+                variant="primary"
+                size="lg"
+                fullWidth
                 onClick={handleSubmitClue}
                 disabled={!clueText.trim() || submitting}
-                className="w-full rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
               >
                 {submitting
                   ? "Submitting..."
                   : editing
                     ? "Update Clue"
                     : "Submit Clue"}
-              </button>
+              </Button>
             </div>
           ) : (
             <motion.div
@@ -136,7 +139,7 @@ export default function CluePhase({
               </p>
               <button
                 onClick={handleEditClue}
-                className="mt-2 text-sm text-success underline underline-offset-2 hover:text-success/80"
+                className="mt-2 text-sm text-success underline underline-offset-2 transition-colors hover:text-success/80"
               >
                 Edit clue
               </button>
@@ -146,8 +149,8 @@ export default function CluePhase({
       )}
 
       {/* Status of other players */}
-      <div className="glass-card rounded-xl p-4 shadow-sm">
-        <div className="mb-2 text-sm font-medium text-text-secondary">
+      <div className="panel rounded-2xl p-4">
+        <div className="mb-2 text-sm font-medium text-silt">
           {submittedCount} / {rounds.length} clues submitted
         </div>
         <div className="flex justify-center gap-2">
@@ -157,15 +160,16 @@ export default function CluePhase({
             return (
               <div
                 key={p._id}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white"
-                style={{
-                  backgroundColor: hasClue ? p.color : "#E5E5E5",
-                }}
+                className={[
+                  "flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold",
+                  hasClue ? "text-white" : "bg-shoal/60",
+                ].join(" ")}
+                style={hasClue ? { backgroundColor: p.color } : undefined}
               >
                 {hasClue ? (
                   <Check className="h-4 w-4" />
                 ) : (
-                  <Clock className="h-4 w-4 text-text-secondary" />
+                  <Clock className="h-4 w-4 text-silt" />
                 )}
               </div>
             );
@@ -175,7 +179,10 @@ export default function CluePhase({
 
       {/* Host can advance early when all submitted */}
       {isHost && allSubmitted && (
-        <button
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           onClick={async () => {
             if (advancing) return;
             setAdvancing(true);
@@ -186,12 +193,11 @@ export default function CluePhase({
             }
           }}
           disabled={advancing}
-          className="w-full rounded-xl bg-accent px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
         >
           {advancing
             ? "Starting..."
-            : "Everyone\u2019s ready \u2014 Start Guessing!"}
-        </button>
+            : "Everyone’s ready — Start Guessing!"}
+        </Button>
       )}
     </div>
   );

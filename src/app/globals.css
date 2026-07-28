@@ -1,44 +1,148 @@
 @import "tailwindcss";
 
+/* ============================================================
+   DEEP WATER
+   The pond in FluidBackground is the environment, not a backdrop.
+   Every value below derives from one idea: you are under water,
+   and the light comes from above.
+
+   Water absorbs long wavelengths first, so depth runs warm at the
+   surface -> teal -> petrol -> near-black. That gives us two light
+   sources rather than one accent: `sun` (warm, from the surface)
+   and `caustic` (cool, refracted through it). Surfaces are lit on
+   their top edge and occlude downward.
+   ============================================================ */
+
 @theme {
-  --color-cream: #FFF8F0;
-  --color-surface: #FFFFFF;
-  --color-primary: #E8553A;
-  --color-secondary: #F4A261;
-  --color-accent: #2A9D8F;
-  --color-text: #2D2D2D;
-  --color-text-secondary: #6B6B6B;
-  --color-success: #4CAF50;
-  --color-gold: #FFD700;
-  --color-score-orange: #FF9800;
-  --color-score-coral: #FF7043;
+  /* Water column, shallow -> deep */
+  --color-shallows: #123B50;
+  --color-deep: #0C2B3E;
+  --color-abyss: #06182A;
+  --color-shoal: #14495A;
+
+  /* The two lights */
+  --color-caustic: #6FE0D2;
+  --color-sun: #FFDFA3;
+
+  /* Ink */
+  --color-foam: #E8F5F3;
+  --color-silt: #8FB2BC;
+
+  /* Semantic aliases — components use these, so the palette can move
+     without touching every file. */
+  --color-primary: var(--color-caustic);
+  --color-accent: var(--color-sun);
+  --color-surface: var(--color-deep);
+  --color-text: var(--color-foam);
+  --color-text-secondary: var(--color-silt);
+  --color-success: #58D9A6;
+  --color-gold: #FFD98A;
+  /* There is no red in this palette — a saturated red would read as a foreign
+     object. Errors use a warm coral that still belongs to the surface light. */
+  --color-danger: #FF9E8A;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-title: var(--font-bricolage), "Inter", ui-sans-serif, sans-serif;
 }
 
 html {
-  /* Prevent pull-to-refresh on mobile when interacting with dial */
+  /* Pull-to-refresh guard. This is the ONLY thing that should suppress
+     native scrolling — never a document-level touchmove preventDefault. */
   overscroll-behavior-y: contain;
 }
 
 body {
-  background: #FFF8F0;
   min-height: 100vh;
   color: var(--color-text);
   font-family: var(--font-sans);
-  /* Safe area insets for notched phones */
+
+  /* Descending the water column as you scroll. Fixed attachment so it
+     reads as one continuous depth rather than repeating per section. */
+  background:
+    linear-gradient(
+      to bottom,
+      var(--color-shallows) 0%,
+      var(--color-deep) 38%,
+      var(--color-abyss) 100%
+    );
+  background-attachment: fixed;
+
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
 }
 
-/* Glass card style */
-.glass-card {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.5);
+/* Warm light entering from the surface. Sits behind the canvas so the
+   creatures swim through it. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0 0 auto 0;
+  height: 48vh;
+  background: radial-gradient(
+    130% 100% at 50% 0%,
+    rgba(255, 223, 163, 0.17),
+    transparent 68%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Submerged panel ─────────────────────────────────────────
+   Replaces the frosted-white card. Underwater, a surface is DARKER
+   than the water in front of it, catches light on its top edge only,
+   and occludes light downward. */
+.panel {
+  background: linear-gradient(
+    to bottom,
+    rgba(20, 73, 90, 0.34),
+    rgba(6, 24, 42, 0.52)
+  );
+  backdrop-filter: blur(10px) saturate(130%);
+  -webkit-backdrop-filter: blur(10px) saturate(130%);
+  border: 1px solid rgba(111, 224, 210, 0.14);
+  box-shadow:
+    inset 0 1px 0 rgba(111, 224, 210, 0.26),
+    0 18px 44px -20px rgba(0, 0, 0, 0.6);
+}
+
+/* A panel that should feel closer to the surface — lobby, landing. */
+.panel-lit {
+  background: linear-gradient(
+    to bottom,
+    rgba(35, 96, 114, 0.4),
+    rgba(12, 43, 62, 0.5)
+  );
+  border-color: rgba(111, 224, 210, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(111, 224, 210, 0.36),
+    0 18px 44px -20px rgba(0, 0, 0, 0.55);
+}
+
+/* ── Light through water ─────────────────────────────────────
+   For the wordmark and the score. Luminous, not a text-shadow drop. */
+.lit {
+  text-shadow:
+    0 0 24px rgba(111, 224, 210, 0.45),
+    0 0 60px rgba(111, 224, 210, 0.18);
+}
+
+.lit-warm {
+  text-shadow:
+    0 0 24px rgba(255, 223, 163, 0.5),
+    0 0 64px rgba(255, 223, 163, 0.2);
+}
+
+/* Hairline that reads as a light refraction rather than a border. */
+.rule-caustic {
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(111, 224, 210, 0.35),
+    transparent
+  );
 }
 
 /* Tabular figures for score numbers */
@@ -51,6 +155,12 @@ button,
 a,
 [role="button"] {
   touch-action: manipulation;
+}
+
+/* Selection should look like light catching silt */
+::selection {
+  background: rgba(111, 224, 210, 0.28);
+  color: var(--color-foam);
 }
 
 /* Smooth scrolling */

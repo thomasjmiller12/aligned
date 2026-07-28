@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { Trophy, RotateCcw, Home } from "lucide-react";
 import Link from "next/link";
 import Confetti from "../Confetti";
+import { Button } from "@/components/ui/Button";
 import { useEffect, useRef, useState } from "react";
 import { playGameOver } from "@/lib/sounds";
 
@@ -72,6 +73,9 @@ export default function GameOverPhase({
         : [null, podiumPlayers[0] ?? null, null];
   const MEDALS = ["🥇", "🥈", "🥉"];
   const PODIUM_HEIGHTS = ["h-16", "h-11", "h-8"];
+  const roundRecapRows = rounds
+    ? rounds.filter((r) => r.clue).sort((a, b) => a.roundIndex - b.roundIndex)
+    : [];
 
   function getVerdict() {
     if (percentage >= 80) return "Perfectly Aligned! 🎯";
@@ -100,13 +104,13 @@ export default function GameOverPhase({
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
       >
-        <h1 className="text-5xl font-bold text-primary tabular-nums">
+        <h1 className="lit-warm font-title text-6xl font-bold text-sun tabular-nums">
           {game.teamScore}
         </h1>
         <p className="mt-1 text-lg text-text-secondary">
           out of {maxPossible} possible points
         </p>
-        <p className="mt-2 text-2xl font-semibold">{getVerdict()}</p>
+        <p className="mt-2 text-2xl font-semibold text-foam">{getVerdict()}</p>
       </motion.div>
 
       {/* Player Scores */}
@@ -115,7 +119,7 @@ export default function GameOverPhase({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.7 }}
-          className="glass-card rounded-2xl p-5 shadow-sm"
+          className="panel rounded-2xl p-5"
         >
           <h3 className="mb-1 text-sm font-medium uppercase tracking-wider text-text-secondary">
             Guessing Scores
@@ -124,7 +128,7 @@ export default function GameOverPhase({
             Points you earned from your own guesses
           </p>
 
-          {/* Podium for the top 3 */}
+          {/* Podium for the top 3 — submerged plinths, height carries rank */}
           <div className="mb-4 flex items-end justify-center gap-3">
             {podiumSlots
               .filter((player): player is NonNullable<typeof player> => player !== null)
@@ -136,7 +140,7 @@ export default function GameOverPhase({
                   transition={{ delay: 0.85 + i * 0.1 }}
                   className="flex w-20 flex-col items-center"
                 >
-                  <span className="text-2xl leading-none">
+                  <span className="text-base leading-none">
                     {MEDALS[player.rank - 1]}
                   </span>
                   <div
@@ -149,8 +153,7 @@ export default function GameOverPhase({
                     {player.name}
                   </span>
                   <div
-                    className={`mt-1 flex w-full items-start justify-center rounded-t-lg pt-1 text-sm font-bold text-white ${PODIUM_HEIGHTS[player.rank - 1]}`}
-                    style={{ backgroundColor: player.color }}
+                    className={`mt-1 flex w-full items-start justify-center rounded-t-xl bg-shoal/40 pt-1 text-sm font-bold text-foam shadow-[inset_0_1px_0_rgba(111,224,210,0.35)] ${PODIUM_HEIGHTS[player.rank - 1]}`}
                   >
                     {playerScores[player._id] ?? 0}
                   </div>
@@ -165,7 +168,7 @@ export default function GameOverPhase({
                 return (
                   <div
                     key={player._id}
-                    className="flex items-center gap-3 rounded-lg bg-cream px-3 py-2 text-sm"
+                    className="flex items-center gap-3 rounded-xl bg-foam/5 px-3 py-2 text-sm"
                   >
                     <span className="font-mono text-xs text-text-secondary">
                       {i + 4}
@@ -176,7 +179,7 @@ export default function GameOverPhase({
                     >
                       {player.name.charAt(0).toUpperCase()}
                     </div>
-                    <span className="flex-1 text-left font-medium">
+                    <span className="flex-1 text-left font-medium text-foam">
                       {player.name}
                     </span>
                     <span className="font-bold tabular-nums" style={{ color: player.color }}>
@@ -196,7 +199,7 @@ export default function GameOverPhase({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.75 }}
-          className="glass-card rounded-2xl p-5 shadow-sm"
+          className="panel rounded-2xl p-5"
         >
           <h3 className="mb-1 text-sm font-medium uppercase tracking-wider text-text-secondary">
             Best Clues
@@ -212,7 +215,7 @@ export default function GameOverPhase({
               return (
                 <div
                   key={c.clueGiverId}
-                  className="rounded-lg bg-cream px-3 py-2 text-left text-sm"
+                  className="rounded-xl bg-foam/5 px-3 py-2 text-left text-sm"
                 >
                   <div className="flex items-center gap-3">
                     <span className="w-4 font-mono text-xs text-text-secondary">
@@ -224,7 +227,7 @@ export default function GameOverPhase({
                     >
                       {giver?.name.charAt(0).toUpperCase() ?? "?"}
                     </div>
-                    <span className="flex-1 truncate font-medium">
+                    <span className="flex-1 truncate font-medium text-foam">
                       {giver?.name ?? "Unknown"}
                     </span>
                     <span
@@ -239,7 +242,7 @@ export default function GameOverPhase({
                   </div>
                   {/* Accuracy bar + the clue itself */}
                   <div className="mt-1.5 flex items-center gap-2 pl-[3.25rem]">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/5">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-foam/10">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${pct}%` }}
@@ -273,22 +276,18 @@ export default function GameOverPhase({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="glass-card rounded-2xl p-5 shadow-sm"
+          className="panel rounded-2xl p-5"
         >
           <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-secondary">
             Round Recap
           </h3>
-          <div className="space-y-2">
-            {rounds
-              .filter((r) => r.clue)
-              .sort((a, b) => a.roundIndex - b.roundIndex)
-              .map((r, i) => {
-                const giver = players.find((p) => p._id === r.clueGiverId);
-                return (
-                  <div
-                    key={r._id}
-                    className="flex items-center gap-3 rounded-lg bg-cream px-3 py-2 text-left text-sm"
-                  >
+          <div>
+            {roundRecapRows.map((r, i) => {
+              const giver = players.find((p) => p._id === r.clueGiverId);
+              return (
+                <div key={r._id}>
+                  {i > 0 && <div className="rule-caustic" />}
+                  <div className="flex items-center gap-3 px-1 py-2 text-left text-sm">
                     <span className="font-mono text-xs text-text-secondary">
                       {i + 1}
                     </span>
@@ -297,19 +296,20 @@ export default function GameOverPhase({
                       style={{ backgroundColor: giver?.color }}
                     />
                     <div className="min-w-0 flex-1">
-                      <span className="font-medium">{r.clue}</span>
+                      <span className="font-medium text-foam">{r.clue}</span>
                       <span className="ml-2 text-xs text-text-secondary">
                         {r.spectrumLeft} ↔ {r.spectrumRight}
                       </span>
                     </div>
                     {roundPoints?.[r._id] && (
-                      <span className="flex-shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold tabular-nums">
+                      <span className="flex-shrink-0 rounded-full bg-caustic/10 px-2 py-0.5 text-xs font-semibold tabular-nums text-caustic">
                         +{roundPoints[r._id].points}
                       </span>
                     )}
                   </div>
-                );
-              })}
+                </div>
+              );
+            })}
           </div>
         </motion.div>
       )}
@@ -334,7 +334,10 @@ export default function GameOverPhase({
         className="space-y-3"
       >
         {isHost && (
-          <button
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
             onClick={async () => {
               if (playingAgain) return;
               setPlayingAgain(true);
@@ -345,15 +348,14 @@ export default function GameOverPhase({
               }
             }}
             disabled={playingAgain}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
           >
             <RotateCcw className="h-5 w-5" />
             {playingAgain ? "Loading..." : "Play Again"}
-          </button>
+          </Button>
         )}
         <Link
           href="/"
-          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-gray-200 px-6 py-3 font-medium text-text-secondary transition-all hover:bg-gray-50"
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-caustic/30 px-6 py-3 font-medium text-silt transition-colors hover:bg-foam/5"
         >
           <Home className="h-4 w-4" />
           Back to Home

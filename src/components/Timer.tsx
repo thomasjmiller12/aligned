@@ -43,7 +43,6 @@ export default function Timer({ endsAt, totalSeconds }: TimerProps) {
 
   const progress = totalSeconds > 0 ? secondsLeft / totalSeconds : 0;
   const isUrgent = secondsLeft <= 10;
-  const isWarning = secondsLeft <= 30 && !isUrgent;
   const minutes = Math.floor(secondsLeft / 60);
   const secs = secondsLeft % 60;
 
@@ -54,11 +53,8 @@ export default function Timer({ endsAt, totalSeconds }: TimerProps) {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference * (1 - progress);
 
-  const ringColor = isUrgent
-    ? "#E8553A"
-    : isWarning
-      ? "#F4A261"
-      : "#2A9D8F";
+  // Normal is quiet (silt); urgent shifts warm (sun) — no red in this palette.
+  const ringColor = isUrgent ? "#FFDFA3" : "#8FB2BC";
 
   return (
     <div className="flex flex-col items-center">
@@ -74,7 +70,7 @@ export default function Timer({ endsAt, totalSeconds }: TimerProps) {
             cy={ringSize / 2}
             r={radius}
             fill="none"
-            stroke="#E5E5E5"
+            stroke="rgba(143, 178, 188, 0.22)"
             strokeWidth={strokeWidth}
           />
           <circle
@@ -111,7 +107,7 @@ export default function Timer({ endsAt, totalSeconds }: TimerProps) {
         <motion.div
           aria-hidden="true"
           className="pointer-events-none fixed inset-0 z-50"
-          style={{ boxShadow: "inset 0 0 8vw 1vw rgba(232, 85, 58, 0.5)" }}
+          style={{ boxShadow: "inset 0 0 8vw 1vw rgba(255, 223, 163, 0.3)" }}
           animate={{ opacity: [0.25, 0.7, 0.25] }}
           transition={{ repeat: Infinity, duration: 1 }}
         />

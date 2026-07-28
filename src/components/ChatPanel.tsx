@@ -6,6 +6,7 @@ import { Id } from "../../convex/_generated/dataModel";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, Send, X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
 
 export default function ChatPanel({
   gameId,
@@ -55,18 +56,23 @@ export default function ChatPanel({
     <>
       {/* Floating chat button */}
       {!isOpen && (
-        <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent shadow-lg transition-all hover:bg-accent/90 active:scale-90"
-          aria-label="Open chat"
-        >
-          <MessageCircle className="h-6 w-6 text-white" />
+        <div className="fixed bottom-5 right-5 z-40">
+          <Button
+            onClick={() => setIsOpen(true)}
+            variant="primary"
+            aria-label="Open chat"
+            className="rounded-full"
+            size="iconLg"
+            round
+          >
+            <MessageCircle className="h-6 w-6" />
+          </Button>
           {unreadCount > 0 && (
-            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-xs font-bold text-white">
+            <span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-sun px-1 text-xs font-bold text-abyss">
               {unreadCount > 9 ? "9+" : unreadCount}
             </span>
           )}
-        </button>
+        </div>
       )}
 
       {/* Chat panel */}
@@ -77,19 +83,22 @@ export default function ChatPanel({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="fixed bottom-5 right-5 z-40 flex max-h-[60vh] w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/80 shadow-xl backdrop-blur-md sm:w-80"
+            className="panel fixed bottom-5 right-5 z-40 flex max-h-[60vh] w-[calc(100vw-2.5rem)] flex-col overflow-hidden rounded-2xl sm:w-80"
           >
             {/* Header */}
-            <div className="flex items-center justify-between border-b border-gray-200/50 px-4 py-3">
-              <h3 className="text-sm font-semibold text-text">Chat</h3>
-              <button
+            <div className="flex items-center justify-between px-4 py-3">
+              <h3 className="text-sm font-semibold text-foam">Chat</h3>
+              <Button
+                variant="ghost"
                 onClick={() => setIsOpen(false)}
-                className="rounded-full p-1 text-text-secondary transition-colors hover:bg-black/5"
                 aria-label="Close chat"
+                size="icon"
+                round
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
+            <div className="rule-caustic" />
 
             {/* Messages */}
             <div
@@ -98,12 +107,17 @@ export default function ChatPanel({
               aria-live="polite"
             >
               {messages.length === 0 && (
-                <p className="py-8 text-center text-sm text-text-secondary">
+                <p className="py-8 text-center text-sm text-silt">
                   No messages yet
                 </p>
               )}
-              {messages.map((msg) => (
-                <div key={msg._id} className="flex items-start gap-2">
+              {messages.map((msg, i) => (
+                <div
+                  key={msg._id}
+                  className={`flex items-start gap-2 rounded-xl px-1.5 py-1 ${
+                    i % 2 === 1 ? "bg-foam/[0.03]" : ""
+                  }`}
+                >
                   <span
                     className="mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full"
                     style={{ backgroundColor: msg.playerColor }}
@@ -115,7 +129,7 @@ export default function ChatPanel({
                     >
                       {msg.playerId === myPlayerId ? "You" : msg.playerName}
                     </span>
-                    <p className="text-sm leading-snug text-text">{msg.body}</p>
+                    <p className="text-sm leading-snug text-foam">{msg.body}</p>
                   </div>
                 </div>
               ))}
@@ -123,7 +137,8 @@ export default function ChatPanel({
             </div>
 
             {/* Input */}
-            <div className="flex items-center gap-2 border-t border-gray-200/50 px-3 py-2">
+            <div className="rule-caustic" />
+            <div className="flex items-center gap-2 px-3 py-2">
               <input
                 ref={inputRef}
                 type="text"
@@ -137,16 +152,17 @@ export default function ChatPanel({
                 }}
                 placeholder="Type a message..."
                 maxLength={200}
-                className="flex-1 rounded-lg bg-black/5 px-3 py-2 text-sm outline-none placeholder:text-text-secondary/50 focus:ring-2 focus:ring-accent/20"
+                className="flex-1 rounded-xl border border-caustic/20 bg-abyss/40 px-3 py-2 text-sm text-foam outline-none placeholder:text-silt/50 focus:ring-2 focus:ring-caustic/40"
               />
-              <button
+              <Button
+                variant="secondary"
                 onClick={handleSend}
                 disabled={!input.trim()}
-                className="rounded-lg p-2 text-accent transition-colors hover:bg-accent/10 disabled:opacity-30"
                 aria-label="Send message"
+                size="icon"
               >
                 <Send className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
           </motion.div>
         )}

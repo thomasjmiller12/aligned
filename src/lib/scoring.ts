@@ -30,15 +30,18 @@ export function getScoreLabel(score: number): string {
   }
 }
 
+/** Consumed via inline `style`/SVG fills, which can't read Tailwind utilities —
+ *  so these mirror the deep-water tokens in globals.css by value.
+ *  Warm surface light for the best guesses, cooling toward silt as you miss. */
 export function getScoreColor(score: number): string {
   switch (score) {
     case 4:
-      return "#FBBF24";
+      return "#FFDFA3"; // sun
     case 3:
-      return "#2DD4BF";
+      return "#6FE0D2"; // caustic
     case 2:
-      return "#A7F3D0";
+      return "#58D9A6"; // success
     default:
-      return "#6B6B6B";
+      return "#8FB2BC"; // silt
   }
 }

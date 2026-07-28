@@ -8,6 +8,7 @@ import Timer from "../Timer";
 import SpectrumDial from "../SpectrumDial";
 import { Lock, LockOpen, Eye } from "lucide-react";
 import { playLockIn } from "@/lib/sounds";
+import { Button } from "@/components/ui/Button";
 
 
 interface GuessingPhaseProps {
@@ -161,11 +162,11 @@ export default function GuessingPhase({
       />
 
       {/* Clue Display */}
-      <div>
-        <p className="text-sm text-text-secondary">
+      <div className="px-2">
+        <p className="text-sm text-silt">
           {clueGiver?.name}&apos;s clue:
         </p>
-        <h2 className="text-3xl font-bold text-primary">
+        <h2 className="lit mt-1 font-title text-4xl font-semibold leading-snug tracking-wide text-foam">
           {round.clue || "..."}
         </h2>
       </div>
@@ -187,12 +188,12 @@ export default function GuessingPhase({
 
       {/* Lock In / Watching */}
       {!isPlayer ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-text-secondary">
+        <div className="panel flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-silt">
           <Eye className="h-5 w-5" />
           <span className="font-medium">Spectating</span>
         </div>
       ) : isClueGiver ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl bg-secondary/10 px-4 py-3 text-secondary">
+        <div className="panel flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-caustic">
           <Eye className="h-5 w-5" />
           <span className="font-medium">
             You&apos;re the clue giver — watch and hope!
@@ -204,44 +205,48 @@ export default function GuessingPhase({
             <Lock className="h-5 w-5" />
             <span className="font-medium">Locked in!</span>
           </div>
-          <button
+          <Button
+            variant="ghost"
+            size="md"
             onClick={handleUnlock}
             disabled={unlockPending}
-            className="inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-sm font-medium text-success underline-offset-2 transition-colors hover:bg-success/10 hover:underline disabled:opacity-50"
           >
             <LockOpen className="h-4 w-4" />
             {unlockPending ? "Unlocking..." : "Unlock to change"}
-          </button>
+          </Button>
         </div>
       ) : (
-        <button
+        <Button
+          variant="primary"
+          size="lg"
+          fullWidth
           onClick={handleLockIn}
           disabled={lockPending}
-          className="w-full rounded-xl bg-accent px-6 py-4 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
         >
-          <Lock className="mr-2 inline h-5 w-5" />
+          <Lock className="h-5 w-5" />
           {lockPending ? "Locking..." : "Lock In"}
-        </button>
+        </Button>
       )}
 
       {/* Status */}
-      <p className="text-sm text-text-secondary">
+      <p className="text-xs tabular-nums text-silt">
         {lockedCount} / {totalGuessers} locked in
       </p>
 
       {/* Host can reveal early before everyone locks in */}
       {isHost && !allLockedIn && (
-        <button
+        <Button
+          variant="secondary"
+          size="md"
           onClick={handleReveal}
           disabled={revealPending}
-          className="text-sm text-text-secondary underline hover:text-text disabled:opacity-50"
         >
           {revealPending
             ? "Revealing..."
             : revealArmed
               ? "Confirm — reveal early?"
               : "Reveal early (skip remaining)"}
-        </button>
+        </Button>
       )}
     </div>
   );

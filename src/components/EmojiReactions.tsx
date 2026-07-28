@@ -9,6 +9,7 @@ import {
   playReactionSkull,
   playReactionRainbow,
 } from "@/lib/sounds";
+import { Button } from "@/components/ui/Button";
 
 const EMOJIS = ["💩", "💀", "🌈"] as const;
 
@@ -598,14 +599,14 @@ export default function EmojiReactions({
         }
 
         .combo-label {
-          color: #E8553A;
+          color: #ffdfa3;
           animation: combo-label-shake 0.3s ease-in-out infinite;
           text-shadow:
-            2px 2px 0 #fff,
-            -2px 2px 0 #fff,
-            2px -2px 0 #fff,
-            -2px -2px 0 #fff,
-            0 0 24px rgba(232, 85, 58, 0.6);
+            2px 2px 0 rgba(232, 245, 243, 0.9),
+            -2px 2px 0 rgba(232, 245, 243, 0.9),
+            2px -2px 0 rgba(232, 245, 243, 0.9),
+            -2px -2px 0 rgba(232, 245, 243, 0.9),
+            0 0 24px rgba(255, 223, 163, 0.6);
         }
         @keyframes combo-label-shake {
           0%, 100% { transform: translateX(-1px) rotate(-2deg) scale(1); }
@@ -621,9 +622,9 @@ export default function EmojiReactions({
           opacity: 0;
           will-change: transform, opacity;
         }
-        .combo-ring-1 { color: #E8553A; animation: combo-ring-expand 1.6s ease-out forwards; }
-        .combo-ring-2 { color: #2A9D8F; animation: combo-ring-expand 1.8s ease-out 0.18s forwards; }
-        .combo-ring-3 { color: #FFD23F; animation: combo-ring-expand 2.0s ease-out 0.36s forwards; }
+        .combo-ring-1 { color: #ffdfa3; animation: combo-ring-expand 1.6s ease-out forwards; }
+        .combo-ring-2 { color: #6fe0d2; animation: combo-ring-expand 1.8s ease-out 0.18s forwards; }
+        .combo-ring-3 { color: #ffd98a; animation: combo-ring-expand 2.0s ease-out 0.36s forwards; }
         /* transform + opacity only — animating border-width forced a layout
            and repaint of a ~1000px circle on every frame. */
         @keyframes combo-ring-expand {
@@ -683,13 +684,17 @@ export default function EmojiReactions({
       {/* Reaction buttons */}
       <div className="fixed right-3 bottom-24 z-50 flex flex-col gap-1.5 sm:gap-2">
         {EMOJIS.map((emoji) => (
-          <button
+          <Button
             key={emoji}
+            variant="ghost"
             onClick={() => handleSend(emoji)}
-            className="rounded-full bg-white/80 p-1.5 sm:p-2 text-lg sm:text-xl shadow-md backdrop-blur-sm transition-transform hover:scale-110 active:scale-90"
+            aria-label={`React with ${emoji}`}
+            className="panel rounded-full text-lg leading-none transition-[background-color,box-shadow,transform,border-color] duration-150 ease-out hover:border-caustic/55 hover:-translate-y-px active:translate-y-0 sm:text-xl motion-reduce:transform-none"
+            size="icon"
+            round
           >
             {emoji}
-          </button>
+          </Button>
         ))}
       </div>
     </>

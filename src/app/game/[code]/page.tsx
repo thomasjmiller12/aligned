@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import FluidBackground from "@/components/FluidBackground";
 import ChatPanel from "@/components/ChatPanel";
+import { Button } from "@/components/ui/Button";
 import EmojiReactions from "@/components/EmojiReactions";
 
 export default function GamePage() {
@@ -121,9 +122,11 @@ export default function GamePage() {
 
   if (game === undefined || players === undefined) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
-        <div className="text-3xl font-bold text-primary">Aligned</div>
-        <div className="h-1 w-16 animate-pulse rounded-full bg-primary/30" />
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4">
+        <div className="lit font-title text-3xl font-light uppercase tracking-[0.18em] text-foam">
+          Aligned
+        </div>
+        <div className="h-px w-24 animate-pulse bg-caustic/40" />
       </div>
     );
   }
@@ -132,13 +135,13 @@ export default function GamePage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-text">Game not found</h1>
-          <p className="mt-2 text-text-secondary">
-            Check the code and try again
-          </p>
+          <h1 className="font-title text-2xl font-semibold text-foam">
+            Game not found
+          </h1>
+          <p className="mt-2 text-silt">Check the code and try again</p>
           <Link
             href="/"
-            className="mt-4 inline-block text-primary hover:underline"
+            className="mt-4 inline-block text-caustic hover:underline"
           >
             Back to home
           </Link>
@@ -337,16 +340,29 @@ function JoinInlineForm({
     <div className="flex min-h-screen flex-col items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-primary">Aligned</h1>
-          <p className="mt-2 text-text-secondary">
+          <h1 className="lit font-title text-4xl font-light uppercase tracking-[0.18em] text-foam">
+            Aligned
+          </h1>
+          <p className="mt-3 text-silt">
             {isSpectating ? (
-              <>Game <span className="font-bold tracking-widest">{code}</span> is in progress</>
+              <>
+                Game{" "}
+                <span className="font-title tracking-[0.3em] text-caustic">
+                  {code}
+                </span>{" "}
+                is in progress
+              </>
             ) : (
-              <>Join game <span className="font-bold tracking-widest">{code}</span></>
+              <>
+                Join game{" "}
+                <span className="font-title tracking-[0.3em] text-caustic">
+                  {code}
+                </span>
+              </>
             )}
           </p>
         </div>
-        <div className="glass-card rounded-2xl p-6 shadow-lg space-y-4">
+        <div className="panel-lit space-y-4 rounded-2xl p-6">
           <input
             type="text"
             placeholder="Your name"
@@ -354,24 +370,20 @@ function JoinInlineForm({
             onChange={(e) => setName(e.target.value)}
             maxLength={20}
             autoFocus
-            className="w-full rounded-xl border-2 border-gray-200 bg-white/50 px-4 py-3 text-lg outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+            className="w-full rounded-xl border border-caustic/20 bg-abyss/40 px-4 py-3 text-lg text-foam outline-none transition-all placeholder:text-silt/60 focus:border-caustic/60 focus:ring-2 focus:ring-caustic/25"
             onKeyDown={(e) => e.key === "Enter" && handleJoin()}
           />
-          {error && <p className="text-sm text-red-500">{error}</p>}
-          <button
-            onClick={handleJoin}
-            disabled={loading}
-            className="w-full rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-          >
+          {error && <p className="text-sm text-danger">{error}</p>}
+          <Button onClick={handleJoin} disabled={loading} fullWidth>
             {loading
               ? "Joining..."
               : isSpectating
-                ? "Join as Spectator"
-                : "Join Game"}
-          </button>
+                ? "Join as spectator"
+                : "Join game"}
+          </Button>
           {isSpectating && (
-            <p className="text-center text-xs text-text-secondary">
-              You&apos;ll watch this game and play in the next round
+            <p className="text-center text-xs text-silt">
+              You&apos;ll watch this round, then join the next game
             </p>
           )}
         </div>
