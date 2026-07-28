@@ -16,9 +16,3 @@ export const PLAYER_COLORS = [
   "#0891B2",
   "#E11D48",
 ] as const;
-
-export type PlayerColor = (typeof PLAYER_COLORS)[number];
-
-export function isPlayerColor(value: string): value is PlayerColor {
-  return (PLAYER_COLORS as readonly string[]).includes(value);
-}

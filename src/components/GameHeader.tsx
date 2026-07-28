@@ -1,8 +1,8 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate } from "framer-motion";
 import { Copy, Check, Volume2, VolumeX } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSound } from "@/hooks/useSound";
 
 interface GameHeaderProps {
@@ -22,6 +22,22 @@ export default function GameHeader({
 }: GameHeaderProps) {
   const [copied, setCopied] = useState(false);
   const { isMuted, toggleMute } = useSound();
+
+  const teamScoreValue = useMotionValue(teamScore);
+  const roundedTeamScore = useTransform(teamScoreValue, (v) => Math.round(v));
+  const [displayScore, setDisplayScore] = useState(teamScore);
+
+  useEffect(() => {
+    const controls = animate(teamScoreValue, teamScore, {
+      duration: 0.6,
+      ease: "easeOut",
+    });
+    return () => controls.stop();
+  }, [teamScore, teamScoreValue]);
+
+  useEffect(() => {
+    return roundedTeamScore.on("change", (v) => setDisplayScore(v));
+  }, [roundedTeamScore]);
 
   function copyCode() {
     navigator.clipboard.writeText(code);
@@ -73,7 +89,7 @@ export default function GameHeader({
               animate={{ scale: 1 }}
               className="text-2xl font-bold text-primary tabular-nums"
             >
-              {teamScore}
+              {displayScore}
             </motion.div>
           </div>
         )}

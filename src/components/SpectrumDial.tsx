@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, memo } from "react";
 import { motion } from "framer-motion";
-import { SCORE_ZONES } from "@/lib/scoring";
+import { SCORE_ZONES, calculateScore } from "@/lib/scoring";
 import { playDialDragStart, playDialTick, playDialLand } from "@/lib/sounds";
 
 interface PlayerArrow {
@@ -19,6 +19,7 @@ interface SpectrumDialProps {
   targetPosition?: number;
   showScoringWedge?: boolean;
   myPosition?: number;
+  myColor?: string;
   onPositionChange?: (position: number) => void;
   interactive?: boolean;
   playerArrows?: PlayerArrow[];
@@ -52,15 +53,7 @@ function arcBandPath(startDeg: number, endDeg: number, r: number): string {
   return `M ${s.x} ${s.y} A ${r} ${r} 0 ${largeArc} 1 ${e.x} ${e.y}`;
 }
 
-function getScore(guessDeg: number, targetDeg: number): number {
-  const diff = Math.abs(guessDeg - targetDeg);
-  if (diff <= SCORE_ZONES.BULLSEYE) return 4;
-  if (diff <= SCORE_ZONES.CLOSE) return 3;
-  if (diff <= SCORE_ZONES.NEAR) return 2;
-  return 0;
-}
-
-function AnimatedArrow({
+const AnimatedArrow = memo(function AnimatedArrow({
   arrow,
   showScore,
   targetPosition,
@@ -76,7 +69,7 @@ function AnimatedArrow({
     targetPosition !== undefined && targetPosition >= 0;
   const score =
     showScore && validTarget
-      ? getScore(arrow.position, targetPosition)
+      ? calculateScore(arrow.position, targetPosition)
       : 0;
   const scored = score > 0;
 
@@ -92,7 +85,8 @@ function AnimatedArrow({
         stroke={arrow.color}
         strokeWidth={2.5}
         strokeLinecap="round"
-        opacity={arrow.lockedIn ? 0.5 : 0.3}
+        strokeDasharray={arrow.lockedIn ? undefined : "4 3"}
+        opacity={arrow.lockedIn ? 0.55 : 0.3}
       />
 
       {/* Player dot at arrow tip */}
@@ -139,7 +133,17 @@ function AnimatedArrow({
       )}
     </g>
   );
-}
+},
+(prev, next) =>
+  prev.arrow.id === next.arrow.id &&
+  prev.arrow.color === next.arrow.color &&
+  prev.arrow.initial === next.arrow.initial &&
+  prev.arrow.position === next.arrow.position &&
+  prev.arrow.lockedIn === next.arrow.lockedIn &&
+  prev.showScore === next.showScore &&
+  prev.targetPosition === next.targetPosition &&
+  prev.scoreYOffset === next.scoreYOffset
+);
 
 export default function SpectrumDial({
   leftLabel,
@@ -147,6 +151,7 @@ export default function SpectrumDial({
   targetPosition,
   showScoringWedge,
   myPosition,
+  myColor,
   onPositionChange,
   interactive = false,
   playerArrows = [],
@@ -156,6 +161,11 @@ export default function SpectrumDial({
 }: SpectrumDialProps) {
   const svgRef = useRef<SVGSVGElement>(null);
   const lastTickAngleRef = useRef<number | null>(null);
+  // Pointer currently owning the drag — ignore events from any other pointer
+  const activePointerIdRef = useRef<number | null>(null);
+  // Bounding rect cached once per drag (on pointerdown) to avoid a forced
+  // layout read on every pointermove
+  const rectRef = useRef<DOMRect | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   // Raw pointer position in SVG-space during drag (null when not dragging)
   const [dragPos, setDragPos] = useState<{ x: number; y: number } | null>(null);
@@ -165,10 +175,10 @@ export default function SpectrumDial({
   const hasTarget =
     targetPosition !== undefined && targetPosition >= 0 && targetPosition <= 180;
 
+  const canInteract = interactive && !lockedIn;
+
   const getAngleFromEvent = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!svgRef.current) return null;
-      const rect = svgRef.current.getBoundingClientRect();
+    (clientX: number, clientY: number, rect: DOMRect) => {
       const scaleX = rect.width / SIZE;
       const scaleY = rect.height / VB_HEIGHT;
       const x = (clientX - rect.left) / scaleX - CENTER_X;
@@ -183,9 +193,7 @@ export default function SpectrumDial({
   );
 
   const clientToSvg = useCallback(
-    (clientX: number, clientY: number): { x: number; y: number } | null => {
-      if (!svgRef.current) return null;
-      const rect = svgRef.current.getBoundingClientRect();
+    (clientX: number, clientY: number, rect: DOMRect): { x: number; y: number } => {
       const scaleX = rect.width / SIZE;
       const scaleY = rect.height / VB_HEIGHT;
       let x = (clientX - rect.left) / scaleX;
@@ -209,16 +217,20 @@ export default function SpectrumDial({
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (!interactive || lockedIn) return;
+      if (!svgRef.current) return;
       e.preventDefault();
+      const rect = svgRef.current.getBoundingClientRect();
+      rectRef.current = rect;
+      activePointerIdRef.current = e.pointerId;
       (e.target as Element).setPointerCapture?.(e.pointerId);
       setIsDragging(true);
       if (navigator.vibrate) navigator.vibrate(10);
       playDialDragStart();
       lastTickAngleRef.current = null;
-      const svgPos = clientToSvg(e.clientX, e.clientY);
-      if (svgPos) setDragPos(svgPos);
-      const angle = getAngleFromEvent(e.clientX, e.clientY);
-      if (angle !== null) onPositionChange?.(angle);
+      const svgPos = clientToSvg(e.clientX, e.clientY, rect);
+      setDragPos(svgPos);
+      const angle = getAngleFromEvent(e.clientX, e.clientY, rect);
+      onPositionChange?.(angle);
       onDragMove?.(e.clientX, e.clientY);
     },
     [interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange, onDragMove]
@@ -227,22 +239,26 @@ export default function SpectrumDial({
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
       if (!isDragging || !interactive || lockedIn) return;
-      const svgPos = clientToSvg(e.clientX, e.clientY);
-      if (svgPos) setDragPos(svgPos);
-      const angle = getAngleFromEvent(e.clientX, e.clientY);
-      if (angle !== null) {
-        if (lastTickAngleRef.current === null || Math.abs(angle - lastTickAngleRef.current) >= 10) {
-          playDialTick();
-          lastTickAngleRef.current = angle;
-        }
-        onPositionChange?.(angle);
+      if (e.pointerId !== activePointerIdRef.current) return;
+      const rect = rectRef.current;
+      if (!rect) return;
+      const svgPos = clientToSvg(e.clientX, e.clientY, rect);
+      setDragPos(svgPos);
+      const angle = getAngleFromEvent(e.clientX, e.clientY, rect);
+      if (lastTickAngleRef.current === null || Math.abs(angle - lastTickAngleRef.current) >= 10) {
+        playDialTick();
+        lastTickAngleRef.current = angle;
       }
+      onPositionChange?.(angle);
       onDragMove?.(e.clientX, e.clientY);
     },
     [isDragging, interactive, lockedIn, getAngleFromEvent, clientToSvg, onPositionChange, onDragMove]
   );
 
-  const handlePointerUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    if (e.pointerId !== activePointerIdRef.current) return;
+    activePointerIdRef.current = null;
+    rectRef.current = null;
     if (isDragging && dragPos) {
       // Only trigger landing animation for real drags (moved significantly from arc)
       const arcTip = myPosition !== undefined ? posOnArc(myPosition, RADIUS - 5) : null;
@@ -261,7 +277,41 @@ export default function SpectrumDial({
     onDragEnd?.();
   }, [isDragging, dragPos, myPosition, onDragEnd]);
 
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!canInteract) return;
+      const bigStep = 10;
+      const smallStep = 1;
+      let delta = 0;
+      if (e.key === "ArrowLeft" || e.key === "ArrowDown") {
+        delta = -(e.shiftKey ? bigStep : smallStep);
+      } else if (e.key === "ArrowRight" || e.key === "ArrowUp") {
+        delta = e.shiftKey ? bigStep : smallStep;
+      } else if (e.key === "PageDown") {
+        delta = -bigStep;
+      } else if (e.key === "PageUp") {
+        delta = bigStep;
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        onPositionChange?.(0);
+        return;
+      } else if (e.key === "End") {
+        e.preventDefault();
+        onPositionChange?.(180);
+        return;
+      } else {
+        return;
+      }
+      e.preventDefault();
+      const current = myPosition ?? 90;
+      const next = Math.max(0, Math.min(180, current + delta));
+      onPositionChange?.(next);
+    },
+    [canInteract, myPosition, onPositionChange]
+  );
+
   const isFreeDragging = isDragging && dragPos !== null;
+  const lockedColor = myColor ?? "#4CAF50";
 
   const arcStart = posOnArc(0, RADIUS);
   const arcEnd = posOnArc(180, RADIUS);
@@ -275,12 +325,25 @@ export default function SpectrumDial({
       <svg
         ref={svgRef}
         viewBox={`0 ${VB_Y_OFFSET} ${SIZE} ${VB_HEIGHT}`}
-        className="w-full max-w-[420px] touch-none select-none"
+        className="w-full max-w-[420px] touch-none select-none rounded-3xl focus:outline-none focus-visible:ring-4 focus-visible:ring-primary/60 focus-visible:ring-offset-2 focus-visible:ring-offset-cream"
         style={{ overflow: "visible" }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onKeyDown={handleKeyDown}
+        role={canInteract ? "slider" : undefined}
+        tabIndex={canInteract ? 0 : -1}
+        aria-orientation={canInteract ? "horizontal" : undefined}
+        aria-label={canInteract ? `${leftLabel} to ${rightLabel} spectrum dial` : undefined}
+        aria-valuemin={canInteract ? 0 : undefined}
+        aria-valuemax={canInteract ? 180 : undefined}
+        aria-valuenow={canInteract ? Math.round(myPosition ?? 90) : undefined}
+        aria-valuetext={
+          canInteract
+            ? `${Math.round(myPosition ?? 90)} degrees, from ${leftLabel} to ${rightLabel}`
+            : undefined
+        }
       >
         <defs>
           <radialGradient id="bgGlow" cx="50%" cy="100%" r="80%" fx="50%" fy="100%">
@@ -455,7 +518,7 @@ export default function SpectrumDial({
                   cx={arcTip.x}
                   cy={arcTip.y}
                   r={6}
-                  fill={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  fill={lockedIn ? lockedColor : "#2D2D2D"}
                   opacity={0.25}
                 />
               )}
@@ -468,7 +531,7 @@ export default function SpectrumDial({
                   y1={CENTER_Y}
                   x2={dragPos!.x}
                   y2={dragPos!.y}
-                  stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  stroke={lockedIn ? lockedColor : "#2D2D2D"}
                   strokeWidth={2}
                   strokeDasharray="4 4"
                   opacity={0.2}
@@ -481,7 +544,7 @@ export default function SpectrumDial({
                   y1={CENTER_Y}
                   animate={{ x2: arcTip.x, y2: arcTip.y }}
                   transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                  stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  stroke={lockedIn ? lockedColor : "#2D2D2D"}
                   strokeWidth={4}
                   strokeLinecap="round"
                 />
@@ -500,7 +563,7 @@ export default function SpectrumDial({
                     : { type: "spring", stiffness: 300, damping: 20 }
                 }
                 fill={
-                  lockedIn ? "#4CAF50" : isFreeDragging ? "#E8553A" : "#2D2D2D"
+                  lockedIn ? lockedColor : isFreeDragging ? "#E8553A" : "#2D2D2D"
                 }
                 stroke="white"
                 strokeWidth={3}
@@ -520,7 +583,7 @@ export default function SpectrumDial({
                   y1={CENTER_Y}
                   x2={arcTip.x}
                   y2={arcTip.y}
-                  stroke={lockedIn ? "#4CAF50" : "#2D2D2D"}
+                  stroke={lockedIn ? lockedColor : "#2D2D2D"}
                   strokeWidth={2}
                   opacity={0.12}
                   strokeLinecap="round"
@@ -536,7 +599,7 @@ export default function SpectrumDial({
                   animate={{ r: 24, opacity: 0 }}
                   transition={{ duration: 0.4, ease: "easeOut" }}
                   fill="none"
-                  stroke={lockedIn ? "#4CAF50" : "#E8553A"}
+                  stroke={lockedIn ? lockedColor : "#E8553A"}
                   strokeWidth={2}
                 />
               )}
@@ -550,11 +613,17 @@ export default function SpectrumDial({
       </svg>
 
       {/* Labels */}
-      <div className="-mt-3 flex w-full max-w-[420px] justify-between px-1">
-        <span className="max-w-[40%] text-sm font-semibold text-text-secondary">
+      <div className="-mt-3 flex w-full max-w-[420px] justify-between gap-2 px-1">
+        <span
+          className="block max-w-[40%] truncate text-sm font-semibold text-text-secondary"
+          title={leftLabel}
+        >
           {leftLabel}
         </span>
-        <span className="max-w-[40%] text-right text-sm font-semibold text-text-secondary">
+        <span
+          className="block max-w-[40%] truncate text-right text-sm font-semibold text-text-secondary"
+          title={rightLabel}
+        >
           {rightLabel}
         </span>
       </div>

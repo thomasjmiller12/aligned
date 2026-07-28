@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "framer-motion";
 import { Eye } from "lucide-react";
 import { Doc } from "../../convex/_generated/dataModel";
 
@@ -26,14 +27,20 @@ export default function PlayerBar({
   });
 
   return (
-    <div className="flex justify-center gap-2 px-4 py-2">
-      {sorted.map((player) => {
+    <div className="flex flex-wrap justify-center gap-2 px-4 py-2">
+      {sorted.map((player, i) => {
         const isClueGiver = currentRound?.clueGiverId === player._id;
         const isMe = player.sessionId === sessionId;
         const score = playerScores?.[player._id] ?? 0;
 
         return (
-          <div key={player._id} className="flex flex-col items-center gap-1">
+          <motion.div
+            key={player._id}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.1 }}
+            className="flex flex-col items-center gap-1"
+          >
             <div className="relative">
               <div
                 className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white transition-all ${
@@ -65,7 +72,7 @@ export default function PlayerBar({
             >
               {isMe ? "You" : player.name.split(" ")[0]}
             </span>
-          </div>
+          </motion.div>
         );
       })}
     </div>

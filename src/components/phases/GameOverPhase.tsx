@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 import { Trophy, RotateCcw, Home } from "lucide-react";
 import Link from "next/link";
 import Confetti from "../Confetti";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { playGameOver } from "@/lib/sounds";
 
 interface GameOverPhaseProps {
@@ -36,6 +36,7 @@ export default function GameOverPhase({
 
   const clueRanking = clueScores?.byPlayer ?? [];
   const roundPoints = clueScores?.byRound;
+  const [playingAgain, setPlayingAgain] = useState(false);
 
   // Play game over fanfare once
   const soundPlayedRef = useRef(false);
@@ -47,9 +48,30 @@ export default function GameOverPhase({
   }, []);
 
   const activePlayers = players.filter((p) => !p.isSpectator);
-  const maxPossible = (activePlayers.length - 1) * 4 * activePlayers.length;
+  // Rounds that were auto-skipped for having no clue never got scored, so they
+  // shouldn't count toward the "max possible" denominator.
+  const scoredRoundCount = rounds
+    ? rounds.filter((r) => r.clue && r.status === "scored").length
+    : activePlayers.length;
+  const maxPossible = scoredRoundCount * (activePlayers.length - 1) * 4;
   const percentage =
     maxPossible > 0 ? Math.round((game.teamScore / maxPossible) * 100) : 0;
+
+  const sortedByScore = [...activePlayers].sort(
+    (a, b) => (playerScores?.[b._id] ?? 0) - (playerScores?.[a._id] ?? 0)
+  );
+  const podiumPlayers = sortedByScore
+    .slice(0, 3)
+    .map((p, i) => ({ ...p, rank: i + 1 }));
+  const restPlayers = sortedByScore.slice(3);
+  const podiumSlots =
+    podiumPlayers.length === 3
+      ? [podiumPlayers[1], podiumPlayers[0], podiumPlayers[2]]
+      : podiumPlayers.length === 2
+        ? [podiumPlayers[1], podiumPlayers[0], null]
+        : [null, podiumPlayers[0] ?? null, null];
+  const MEDALS = ["🥇", "🥈", "🥉"];
+  const PODIUM_HEIGHTS = ["h-16", "h-11", "h-8"];
 
   function getVerdict() {
     if (percentage >= 80) return "Perfectly Aligned! 🎯";
@@ -61,7 +83,7 @@ export default function GameOverPhase({
 
   return (
     <div className="space-y-6 pt-8 text-center">
-      <Confetti />
+      <Confetti percentage={percentage} />
 
       {/* Trophy */}
       <motion.div
@@ -101,10 +123,44 @@ export default function GameOverPhase({
           <p className="mb-3 text-xs text-text-secondary">
             Points you earned from your own guesses
           </p>
-          <div className="space-y-2">
-            {[...activePlayers]
-              .sort((a, b) => (playerScores[b._id] ?? 0) - (playerScores[a._id] ?? 0))
-              .map((player, i) => {
+
+          {/* Podium for the top 3 */}
+          <div className="mb-4 flex items-end justify-center gap-3">
+            {podiumSlots
+              .filter((player): player is NonNullable<typeof player> => player !== null)
+              .map((player, i) => (
+                <motion.div
+                  key={player._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.85 + i * 0.1 }}
+                  className="flex w-20 flex-col items-center"
+                >
+                  <span className="text-2xl leading-none">
+                    {MEDALS[player.rank - 1]}
+                  </span>
+                  <div
+                    className="mt-1 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                    style={{ backgroundColor: player.color }}
+                  >
+                    {player.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="mt-1 max-w-full truncate text-xs font-medium">
+                    {player.name}
+                  </span>
+                  <div
+                    className={`mt-1 flex w-full items-start justify-center rounded-t-lg pt-1 text-sm font-bold text-white ${PODIUM_HEIGHTS[player.rank - 1]}`}
+                    style={{ backgroundColor: player.color }}
+                  >
+                    {playerScores[player._id] ?? 0}
+                  </div>
+                </motion.div>
+              ))}
+          </div>
+
+          {restPlayers.length > 0 && (
+            <div className="space-y-2">
+              {restPlayers.map((player, i) => {
                 const score = playerScores[player._id] ?? 0;
                 return (
                   <div
@@ -112,7 +168,7 @@ export default function GameOverPhase({
                     className="flex items-center gap-3 rounded-lg bg-cream px-3 py-2 text-sm"
                   >
                     <span className="font-mono text-xs text-text-secondary">
-                      {i + 1}
+                      {i + 4}
                     </span>
                     <div
                       className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
@@ -129,7 +185,8 @@ export default function GameOverPhase({
                   </div>
                 );
               })}
-          </div>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -278,11 +335,20 @@ export default function GameOverPhase({
       >
         {isHost && (
           <button
-            onClick={() => playAgain({ gameId: game._id, sessionId })}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98]"
+            onClick={async () => {
+              if (playingAgain) return;
+              setPlayingAgain(true);
+              try {
+                await playAgain({ gameId: game._id, sessionId });
+              } catch {
+                setPlayingAgain(false);
+              }
+            }}
+            disabled={playingAgain}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 py-4 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
           >
             <RotateCcw className="h-5 w-5" />
-            Play Again
+            {playingAgain ? "Loading..." : "Play Again"}
           </button>
         )}
         <Link

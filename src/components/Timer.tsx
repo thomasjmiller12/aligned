@@ -9,8 +9,15 @@ interface TimerProps {
   totalSeconds: number;
 }
 
+function remainingFromEndsAt(endsAt: number | undefined, totalSeconds: number) {
+  if (!endsAt) return totalSeconds;
+  return Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
+}
+
 export default function Timer({ endsAt, totalSeconds }: TimerProps) {
-  const [secondsLeft, setSecondsLeft] = useState(totalSeconds);
+  const [secondsLeft, setSecondsLeft] = useState(() =>
+    remainingFromEndsAt(endsAt, totalSeconds),
+  );
   const prevSecondsRef = useRef(totalSeconds);
 
   // Play warning sounds at threshold crossings
@@ -100,6 +107,15 @@ export default function Timer({ endsAt, totalSeconds }: TimerProps) {
           </motion.span>
         </div>
       </div>
+      {isUrgent && secondsLeft > 0 && (
+        <motion.div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-0 z-50"
+          style={{ boxShadow: "inset 0 0 8vw 1vw rgba(232, 85, 58, 0.5)" }}
+          animate={{ opacity: [0.25, 0.7, 0.25] }}
+          transition={{ repeat: Infinity, duration: 1 }}
+        />
+      )}
     </div>
   );
 }

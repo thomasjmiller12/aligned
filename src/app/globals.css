@@ -46,6 +46,13 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Avoid double-tap zoom delay on interactive elements */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
 /* Smooth scrolling */
 @media (prefers-reduced-motion: no-preference) {
   html {

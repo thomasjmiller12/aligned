@@ -26,10 +26,33 @@ interface Particle {
   shape: "circle" | "square" | "triangle";
 }
 
-export default function Confetti({ count = 40 }: { count?: number }) {
+// Scale the celebration to how well the team actually did.
+function particleCountForScore(percentage: number) {
+  if (percentage >= 80) return 60;
+  if (percentage >= 60) return 40;
+  if (percentage >= 40) return 22;
+  if (percentage >= 20) return 10;
+  return 4;
+}
+
+export default function Confetti({ percentage = 100 }: { percentage?: number }) {
   const [particles, setParticles] = useState<Particle[]>([]);
+  const [reducedMotion, setReducedMotion] = useState(false);
 
   useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const handleChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (reducedMotion) {
+      setParticles([]);
+      return;
+    }
+    const count = particleCountForScore(percentage);
     const ps: Particle[] = Array.from({ length: count }, (_, i) => ({
       id: i,
       x: Math.random() * 100,
@@ -44,7 +67,29 @@ export default function Confetti({ count = 40 }: { count?: number }) {
       ],
     }));
     setParticles(ps);
-  }, [count]);
+  }, [percentage, reducedMotion]);
+
+  if (reducedMotion) {
+    // Minimal, static celebration — no falling/rotating particles.
+    return (
+      <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          className="absolute inset-x-0 top-8 flex justify-center gap-3"
+        >
+          {COLORS.slice(0, 5).map((color, i) => (
+            <div
+              key={i}
+              className="h-3 w-3 rounded-full"
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none fixed inset-0 z-50 overflow-hidden">

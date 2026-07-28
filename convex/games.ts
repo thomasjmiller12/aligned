@@ -32,9 +32,23 @@ function generateCode(): string {
   return code;
 }
 
+function shuffle<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
+const ALLOWED_REACTION_EMOJIS = ["💩", "💀", "🌈"];
+
 export const createGame = mutation({
   args: { hostName: v.string(), sessionId: v.string() },
   handler: async (ctx, { hostName, sessionId }) => {
+    const trimmedName = hostName.trim().slice(0, 20);
+    if (!trimmedName) throw new Error("Name can't be empty");
+
     // Generate a unique code
     let code: string;
     let existing;
@@ -45,6 +59,11 @@ export const createGame = mutation({
         .withIndex("by_code", (q) => q.eq("code", code))
         .first();
     } while (existing && existing.status !== "game_over");
+
+    if (existing) {
+      // Retire the finished game's code so by_code resolves to exactly the new game.
+      await ctx.db.patch(existing._id, { code: `${code}_retired_${existing._id}` });
+    }
 
     const gameId = await ctx.db.insert("games", {
       code,
@@ -61,7 +80,7 @@ export const createGame = mutation({
     await ctx.db.insert("players", {
       gameId,
       sessionId,
-      name: hostName,
+      name: trimmedName,
       color: PLAYER_COLORS[0],
       order: 0,
       isConnected: true,
@@ -78,6 +97,9 @@ export const joinGame = mutation({
     sessionId: v.string(),
   },
   handler: async (ctx, { code, playerName, sessionId }) => {
+    const trimmedName = playerName.trim().slice(0, 20);
+    if (!trimmedName) throw new Error("Name can't be empty");
+
     const game = await ctx.db
       .query("games")
       .withIndex("by_code", (q) => q.eq("code", code.toUpperCase()))
@@ -90,8 +112,9 @@ export const joinGame = mutation({
     // Check if player already in game (reconnecting)
     const existingPlayer = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), game._id))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", game._id).eq("sessionId", sessionId)
+      )
       .first();
 
     if (existingPlayer) {
@@ -109,7 +132,7 @@ export const joinGame = mutation({
     const playerId = await ctx.db.insert("players", {
       gameId: game._id,
       sessionId,
-      name: playerName,
+      name: trimmedName,
       color: PLAYER_COLORS[players.length % PLAYER_COLORS.length],
       order: players.length,
       isConnected: true,
@@ -136,7 +159,7 @@ export const startGame = mutation({
     if (players.length < 2) throw new Error("Need at least 2 players");
 
     // Shuffle player order
-    const shuffled = [...players].sort(() => Math.random() - 0.5);
+    const shuffled = shuffle(players);
     for (let i = 0; i < shuffled.length; i++) {
       await ctx.db.patch(shuffled[i]._id, { order: i });
     }
@@ -144,7 +167,7 @@ export const startGame = mutation({
     // Create rounds with spectrums
     const spectrums = getRandomSpectrums(shuffled.length);
     for (let i = 0; i < shuffled.length; i++) {
-      const targetPosition = Math.floor(Math.random() * 173) + 4; // 4-176
+      const targetPosition = Math.floor(Math.random() * 141) + 20; // 20-160
       await ctx.db.insert("rounds", {
         gameId,
         roundIndex: i,
@@ -179,6 +202,9 @@ export const submitClue = mutation({
     clue: v.string(),
   },
   handler: async (ctx, { roundId, sessionId, clue }) => {
+    const trimmed = clue.trim().slice(0, 250);
+    if (!trimmed) throw new Error("Clue can't be empty");
+
     const round = await ctx.db.get(roundId);
     if (!round) throw new Error("Round not found");
 
@@ -187,7 +213,7 @@ export const submitClue = mutation({
       throw new Error("Not your round to give a clue");
     }
 
-    await ctx.db.patch(roundId, { clue, status: "clue_given" });
+    await ctx.db.patch(roundId, { clue: trimmed, status: "clue_given" });
   },
 });
 
@@ -203,11 +229,13 @@ export const submitGuess = mutation({
 
     const player = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), round.gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", round.gameId).eq("sessionId", sessionId)
+      )
       .first();
 
     if (!player) throw new Error("Player not found");
+    if (player.isSpectator) throw new Error("Spectators can't guess");
     if (player._id === round.clueGiverId) {
       throw new Error("Clue-giver cannot guess");
     }
@@ -241,11 +269,13 @@ export const lockGuess = mutation({
 
     const player = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), round.gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", round.gameId).eq("sessionId", sessionId)
+      )
       .first();
 
     if (!player) throw new Error("Player not found");
+    if (player.isSpectator) throw new Error("Spectators can't guess");
 
     const guess = await ctx.db
       .query("guesses")
@@ -277,10 +307,7 @@ export const lockGuess = mutation({
       // Everyone locked — auto-reveal
       let roundScore = 0;
       for (const g of allGuesses) {
-        const diff = Math.abs(g.position - round.targetPosition);
-        if (diff <= 5) roundScore += 4;
-        else if (diff <= 10) roundScore += 3;
-        else if (diff <= 15) roundScore += 2;
+        roundScore += scoreGuess(g.position, round.targetPosition);
       }
 
       await ctx.db.patch(round._id, { status: "revealing" });
@@ -309,8 +336,9 @@ export const unlockGuess = mutation({
 
     const player = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), round.gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", round.gameId).eq("sessionId", sessionId)
+      )
       .first();
     if (!player) throw new Error("Player not found");
     if (player._id === round.clueGiverId) {
@@ -336,6 +364,7 @@ export const advanceToGuessing = mutation({
     const game = await ctx.db.get(gameId);
     if (!game) throw new Error("Game not found");
     if (game.hostId !== sessionId) throw new Error("Only the host can advance");
+    if (game.status !== "clue_phase") return; // Already advanced or wrong state
 
     // Find the first round that has a clue submitted
     const rounds = await ctx.db
@@ -345,7 +374,9 @@ export const advanceToGuessing = mutation({
 
     const firstCluedRound = rounds
       .sort((a, b) => a.roundIndex - b.roundIndex)
-      .find((r) => r.clue && r.status !== "scored");
+      .find(
+        (r) => r.clue && (r.status === "pending" || r.status === "clue_given")
+      );
 
     if (!firstCluedRound) {
       // No clues at all — game over
@@ -512,8 +543,9 @@ export const updatePlayerColor = mutation({
 
     const player = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", gameId).eq("sessionId", sessionId)
+      )
       .first();
     if (!player) throw new Error("Player not in this game");
 
@@ -539,8 +571,9 @@ export const updatePlayerName = mutation({
 
     const player = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", gameId).eq("sessionId", sessionId)
+      )
       .first();
     if (!player) throw new Error("Player not in this game");
 
@@ -575,26 +608,6 @@ export const kickPlayer = mutation({
 
     // Delete the player
     await ctx.db.delete(playerId);
-  },
-});
-
-export const claimHost = mutation({
-  args: { gameId: v.id("games"), sessionId: v.string() },
-  handler: async (ctx, { gameId, sessionId }) => {
-    const game = await ctx.db.get(gameId);
-    if (!game) throw new Error("Game not found");
-    if (game.hostId === sessionId) return; // Already host
-
-    // Verify the claimer is a player in this game
-    const player = await ctx.db
-      .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), gameId))
-      .first();
-
-    if (!player) throw new Error("Only players can become host");
-
-    await ctx.db.patch(gameId, { hostId: sessionId });
   },
 });
 
@@ -865,10 +878,15 @@ export const sendReaction = mutation({
     emoji: v.string(),
   },
   handler: async (ctx, { gameId, sessionId, emoji }) => {
+    if (!ALLOWED_REACTION_EMOJIS.includes(emoji)) {
+      throw new Error("Invalid emoji");
+    }
+
     const player = await ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", gameId).eq("sessionId", sessionId)
+      )
       .first();
     if (!player) throw new Error("Player not found");
 
@@ -918,8 +936,9 @@ export const getMyPlayer = query({
   handler: async (ctx, { gameId, sessionId }) => {
     return ctx.db
       .query("players")
-      .withIndex("by_session", (q) => q.eq("sessionId", sessionId))
-      .filter((q) => q.eq(q.field("gameId"), gameId))
+      .withIndex("by_game_session", (q) =>
+        q.eq("gameId", gameId).eq("sessionId", sessionId)
+      )
       .first();
   },
 });

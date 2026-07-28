@@ -57,7 +57,15 @@ const VARIANTS: Record<TadpoleVariantId, TadpoleVariantDef> = {};
 
 function registerVariant(id: TadpoleVariantId, def: TadpoleVariantDef) {
   VARIANTS[id] = def;
+  variantTable = null;
 }
+
+/** Flattened weight table, rebuilt only when a variant is registered. */
+let variantTable: {
+  ids: TadpoleVariantId[];
+  weights: number[];
+  total: number;
+} | null = null;
 
 /** Simple seeded PRNG (mulberry32). Returns 0-1. */
 function seededRandom(seed: number): number {
@@ -70,15 +78,24 @@ function seededRandom(seed: number): number {
 /** Pick a variant ID using weighted random selection.
  *  If a seed is provided, uses deterministic selection so all clients agree. */
 function rollVariant(seed?: number): TadpoleVariantId {
-  const entries = Object.entries(VARIANTS);
-  const totalWeight = entries.reduce((sum, [, v]) => sum + v.weight, 0);
-  const rand = seed != null ? seededRandom(seed) : Math.random();
-  let roll = rand * totalWeight;
-  for (const [id, v] of entries) {
-    roll -= v.weight;
-    if (roll <= 0) return id;
+  if (!variantTable) {
+    // Insertion order is registration order, which is identical on every client,
+    // so seeded rolls stay in agreement across players.
+    const entries = Object.entries(VARIANTS);
+    variantTable = {
+      ids: entries.map(([id]) => id),
+      weights: entries.map(([, v]) => v.weight),
+      total: entries.reduce((sum, [, v]) => sum + v.weight, 0),
+    };
   }
-  return entries[0][0]; // fallback
+  const { ids, weights, total } = variantTable;
+  const rand = seed != null ? seededRandom(seed) : Math.random();
+  let roll = rand * total;
+  for (let i = 0; i < ids.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return ids[i];
+  }
+  return ids[0]; // fallback
 }
 
 interface PlayerState {
@@ -90,7 +107,6 @@ interface PlayerState {
   prevInterpY: number;
   color: string;
   tadpoles: Tadpole[];
-  lastSpawnTime: number;
   lastBurstAt?: number;
 }
 
@@ -857,6 +873,532 @@ registerVariant("puffer", {
   },
 });
 
+// Eel: long undulating ribbon body with a wedge nose, breaking from the head-circle-plus-tail silhouette (~1 in 67)
+registerVariant("eel", {
+  weight: 2.5,
+  sizeMul: 1.6,
+  speedMul: 0.85,
+  draw(ctx, t, time, alpha, headRadius, speed, reducedMotion) {
+    const waveSpeed = reducedMotion ? 0 : 6 + speed * 0.02;
+
+    // Trace the body from a pointed nose, through the head, along the tail history —
+    // a travelling sine wave (amplitude growing toward the tail) is layered on top,
+    // then rendered as one tapered ribbon using the same left/right-edge technique
+    // as drawTadpoleTail / the ghost tendrils.
+    const points: Array<{ x: number; y: number; w: number }> = [];
+    points.push({
+      x: t.x + Math.cos(t.heading) * headRadius * 1.1,
+      y: t.y + Math.sin(t.heading) * headRadius * 1.1,
+      w: 0,
+    });
+    points.push({ x: t.x, y: t.y, w: headRadius * 0.52 });
+
+    for (let i = 0; i < TAIL_SEGMENTS; i++) {
+      const idx = ((t.tailHead - i) % TAIL_SEGMENTS + TAIL_SEGMENTS) % TAIL_SEGMENTS;
+      const sx = t.tailX[idx];
+      const sy = t.tailY[idx];
+
+      let localAngle = t.heading;
+      if (i < TAIL_SEGMENTS - 1) {
+        const nextIdx = ((t.tailHead - i - 1) % TAIL_SEGMENTS + TAIL_SEGMENTS) % TAIL_SEGMENTS;
+        const ddx = t.tailX[nextIdx] - sx;
+        const ddy = t.tailY[nextIdx] - sy;
+        if (ddx * ddx + ddy * ddy > 0.1) {
+          localAngle = Math.atan2(ddy, ddx);
+        }
+      }
+      const perpX = -Math.sin(localAngle);
+      const perpY = Math.cos(localAngle);
+
+      const frac = (i + 1) / TAIL_SEGMENTS; // 0 (near head) -> 1 (tail tip)
+      const waveAmp = reducedMotion ? 0 : headRadius * (0.1 + frac * 0.75);
+      const wave = reducedMotion
+        ? 0
+        : Math.sin(frac * 5.2 - time * waveSpeed + t.wigglePhase) * waveAmp;
+
+      points.push({
+        x: sx + perpX * wave,
+        y: sy + perpY * wave,
+        w: headRadius * 0.48 * Math.pow(1 - frac, 1.4), // tapers to a fine point at the tail
+      });
+    }
+
+    ctx.beginPath();
+    const p0 = points[0];
+    const a0 = Math.atan2(points[1].y - p0.y, points[1].x - p0.x);
+    ctx.moveTo(p0.x + Math.sin(a0) * p0.w, p0.y - Math.cos(a0) * p0.w);
+
+    for (let i = 1; i < points.length; i++) {
+      const curr = points[i];
+      const prev = points[i - 1];
+      const angle = Math.atan2(curr.y - prev.y, curr.x - prev.x);
+      ctx.lineTo(curr.x + Math.sin(angle) * curr.w, curr.y - Math.cos(angle) * curr.w);
+    }
+
+    const tip = points[points.length - 1];
+    ctx.lineTo(tip.x, tip.y);
+
+    for (let i = points.length - 1; i >= 1; i--) {
+      const curr = points[i];
+      const prev = points[i - 1];
+      const angle = Math.atan2(curr.y - prev.y, curr.x - prev.x);
+      ctx.lineTo(curr.x - Math.sin(angle) * curr.w, curr.y + Math.cos(angle) * curr.w);
+    }
+
+    const aEnd = Math.atan2(points[1].y - p0.y, points[1].x - p0.x);
+    ctx.lineTo(p0.x - Math.sin(aEnd) * p0.w, p0.y + Math.cos(aEnd) * p0.w);
+
+    ctx.closePath();
+    ctx.fillStyle = t.color;
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+
+    drawEyes(ctx, t, alpha, headRadius * 0.6);
+  },
+});
+
+// Seahorse: upright S-curved body with a curling tail and a rapid-flutter dorsal fin — stays vertical regardless of travel direction (~1 in 84)
+registerVariant("seahorse", {
+  weight: 2,
+  sizeMul: 2.2,
+  speedMul: 0.5,
+  draw(ctx, t, time, alpha, headRadius, _speed, reducedMotion) {
+    const R = headRadius;
+
+    // Gentle hover bob (world-vertical, applied before rotation so it never tilts)
+    const bob = reducedMotion ? 0 : Math.sin(time * 2.2 + t.wigglePhase) * R * 0.12;
+    // Small lean into the direction of travel — a few degrees off vertical, never full rotation
+    const lean = Math.max(-0.28, Math.min(0.28, t.vx * 0.012));
+    // Mirror horizontally based on travel direction (heading is already smoothed, so this
+    // doesn't flicker the way raw vx would near zero speed)
+    const facing = Math.cos(t.heading) < 0 ? -1 : 1;
+
+    ctx.save();
+    ctx.translate(t.x, t.y + bob);
+    ctx.rotate(lean);
+    ctx.scale(facing, 1);
+
+    // Body spine: snout -> crown -> nape -> chest (S-curve) -> belly -> coiled tail tip.
+    // Coordinates assume facing = +1 (snout points toward +x); scale() above mirrors it.
+    const spine = [
+      { x: 1.60, y: -1.55, w: 0.08 }, // snout tip
+      { x: 1.05, y: -1.70, w: 0.16 }, // snout base
+      { x: 0.30, y: -1.80, w: 0.58 }, // crown
+      { x: -0.25, y: -1.50, w: 0.42 }, // nape
+      { x: -0.05, y: -1.00, w: 0.44 }, // neck
+      { x: 0.55, y: -0.45, w: 0.75 }, // chest (widest)
+      { x: 0.15, y: 0.15, w: 0.55 }, // belly
+      { x: -0.30, y: 0.65, w: 0.36 }, // tail base
+      { x: 0.05, y: 1.05, w: 0.24 }, // tail curl 1
+      { x: 0.45, y: 1.20, w: 0.14 }, // tail curl 2
+      { x: 0.30, y: 1.50, w: 0.04 }, // tail tip, curling back inward
+    ].map((p) => ({ x: p.x * R, y: p.y * R, w: p.w * R }));
+
+    const left: Array<{ x: number; y: number }> = [];
+    const right: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i < spine.length; i++) {
+      const curr = spine[i];
+      const next = spine[Math.min(i + 1, spine.length - 1)];
+      const prev = spine[Math.max(i - 1, 0)];
+      const dirAngle = Math.atan2(next.y - prev.y, next.x - prev.x);
+      const px = -Math.sin(dirAngle);
+      const py = Math.cos(dirAngle);
+      left.push({ x: curr.x + px * curr.w, y: curr.y + py * curr.w });
+      right.push({ x: curr.x - px * curr.w, y: curr.y - py * curr.w });
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(left[0].x, left[0].y);
+    for (let i = 1; i < left.length; i++) ctx.lineTo(left[i].x, left[i].y);
+    ctx.lineTo(spine[spine.length - 1].x, spine[spine.length - 1].y); // tail tip
+    for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i].x, right[i].y);
+    ctx.closePath();
+    ctx.fillStyle = t.color;
+    ctx.globalAlpha = alpha;
+    ctx.fill();
+
+    // Dorsal fin — 3 thin blades riding the back edge from nape through chest, fluttering
+    // rapidly (real seahorses paddle this fin fast to move, unlike the slow body wiggle)
+    const finFreq = 20;
+    const finIdx = [3, 4, 5];
+    ctx.globalAlpha = alpha * 0.8;
+    for (let i = 0; i < finIdx.length; i++) {
+      const idx = finIdx[i];
+      const base = left[idx];
+      const nx = base.x - spine[idx].x;
+      const ny = base.y - spine[idx].y;
+      const nlen = Math.hypot(nx, ny) || 1;
+      const ux = nx / nlen;
+      const uy = ny / nlen;
+      const flutter = reducedMotion ? 0 : Math.sin(time * finFreq + i * 1.8 + t.wigglePhase);
+      const finLen = R * (0.5 + flutter * 0.25);
+      const tipX = base.x + ux * finLen;
+      const tipY = base.y + uy * finLen;
+      const perpX = -uy;
+      const perpY = ux;
+      const halfW = R * 0.1;
+      ctx.beginPath();
+      ctx.moveTo(base.x + perpX * halfW, base.y + perpY * halfW);
+      ctx.lineTo(tipX, tipY);
+      ctx.lineTo(base.x - perpX * halfW, base.y - perpY * halfW);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Eye — single eye near the crown/snout junction (profile view; only one side ever shows)
+    const eyeX = R * 0.5;
+    const eyeY = R * -1.55;
+    const eyeR = R * 0.22;
+    ctx.globalAlpha = alpha * 0.95;
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#222";
+    ctx.beginPath();
+    ctx.arc(eyeX + eyeR * 0.25, eyeY, eyeR * 0.55, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
+});
+
+// Axolotl: the tadpole that never grew up — wide smiling head, six waving gill fronds, four stubby legs (~1 in 67)
+registerVariant("axolotl", {
+  weight: 2.5,
+  sizeMul: 2.4,
+  speedMul: 0.6,
+  draw(ctx, t, time, alpha, headRadius, speed, reducedMotion) {
+    drawTadpoleTail(ctx, t, time, alpha, headRadius, speed, reducedMotion);
+
+    const bodyLen = headRadius * 0.95;
+    const bodyWide = headRadius * 1.15;
+
+    // Body + legs wash toward a pale pink-white so the player's hue reads as an
+    // undertone rather than the whole creature — gills stay in full color below.
+    const paleFill = (mul = 1) => {
+      ctx.fillStyle = t.color;
+      ctx.globalAlpha = alpha * mul;
+      ctx.fill();
+      ctx.fillStyle = "#FFE9EE";
+      ctx.globalAlpha = alpha * mul * 0.55;
+      ctx.fill();
+    };
+
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate(t.heading);
+
+    // Four stubby legs: a front pair near the head, a rear pair near the tail base
+    const legPairs = [
+      { lx: bodyLen * 0.1, loff: bodyWide * 0.85, scale: 1 },
+      { lx: -bodyLen * 0.55, loff: bodyWide * 0.65, scale: 0.85 },
+    ];
+    for (const side of [-1, 1]) {
+      for (const leg of legPairs) {
+        const kick = reducedMotion ? 0 : Math.sin(time * 5 + t.wigglePhase + leg.lx) * 0.15;
+        const legLen = headRadius * 0.5 * leg.scale;
+        const legWidth = headRadius * 0.22 * leg.scale;
+        ctx.save();
+        ctx.translate(leg.lx, side * leg.loff);
+        ctx.rotate(side * (0.6 + kick));
+        ctx.beginPath();
+        ctx.ellipse(legLen * 0.5, 0, legLen * 0.5, legWidth * 0.5, 0, 0, Math.PI * 2);
+        paleFill();
+        for (let toe = -1; toe <= 1; toe++) {
+          ctx.beginPath();
+          ctx.arc(legLen * 0.95, toe * legWidth * 0.35, legWidth * 0.22, 0, Math.PI * 2);
+          paleFill();
+        }
+        ctx.restore();
+      }
+    }
+
+    // Six feathery gill fronds (3 per side): stalks fan from mostly-outward to
+    // mostly-backward off the neck, each with a few short branching filaments
+    for (const side of [-1, 1]) {
+      for (let i = 0; i < 3; i++) {
+        const spread = 1.95 + i * 0.4;
+        const wobble = reducedMotion ? 0 : Math.sin(time * 3.1 + t.wigglePhase + i * 1.7 + side) * 0.2;
+        const a = spread + wobble;
+        const dirX = Math.cos(a);
+        const dirY = Math.sin(a) * side;
+        const stalkLen = headRadius * (0.8 + i * 0.14);
+        const attachX = -bodyLen * (0.12 + i * 0.13);
+        const attachY = side * bodyWide * 0.78;
+        const tipX = attachX + dirX * stalkLen;
+        const tipY = attachY + dirY * stalkLen;
+        const midX = attachX + dirX * stalkLen * 0.5 - dirY * headRadius * 0.12;
+        const midY = attachY + dirY * stalkLen * 0.5 + dirX * headRadius * 0.12;
+
+        ctx.beginPath();
+        ctx.moveTo(attachX, attachY);
+        ctx.quadraticCurveTo(midX, midY, tipX, tipY);
+        ctx.strokeStyle = t.color;
+        ctx.lineWidth = Math.max(0.5, headRadius * 0.1);
+        ctx.lineCap = "round";
+        ctx.globalAlpha = alpha * 0.85;
+        ctx.stroke();
+
+        const perpX = -dirY;
+        const perpY = dirX;
+        for (let f = 1; f <= 3; f++) {
+          const frac = f / 4;
+          const bx = attachX + (tipX - attachX) * frac;
+          const by = attachY + (tipY - attachY) * frac;
+          const filLen = stalkLen * (0.4 - frac * 0.15);
+          const fs = f % 2 === 0 ? 1 : -1;
+          ctx.beginPath();
+          ctx.moveTo(bx, by);
+          ctx.lineTo(
+            bx + dirX * filLen * 0.4 + perpX * filLen * fs,
+            by + dirY * filLen * 0.4 + perpY * filLen * fs
+          );
+          ctx.lineWidth = Math.max(0.4, headRadius * 0.055);
+          ctx.stroke();
+        }
+      }
+    }
+
+    // Wide rounded head/body
+    ctx.beginPath();
+    ctx.ellipse(0, 0, bodyLen, bodyWide, 0, 0, Math.PI * 2);
+    paleFill();
+
+    // Permanent smile
+    const mouthX = bodyLen * 0.72;
+    const mouthSpan = bodyWide * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(mouthX - mouthSpan, headRadius * 0.1);
+    ctx.quadraticCurveTo(mouthX, headRadius * 0.32, mouthX + mouthSpan, headRadius * 0.1);
+    ctx.strokeStyle = "#3d2228";
+    ctx.lineWidth = Math.max(0.5, headRadius * 0.07);
+    ctx.lineCap = "round";
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.stroke();
+
+    // Two small dark dot eyes, set wide apart
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#241014";
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(bodyLen * 0.35, side * bodyWide * 0.58, headRadius * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
+});
+
+// Starfish: radially-symmetric tumbler that spins freely instead of facing its heading (~1 in 84)
+registerVariant("starfish", {
+  weight: 2,
+  sizeMul: 2.2,
+  speedMul: 0.45,
+  draw(ctx, t, time, alpha, headRadius, _speed, reducedMotion) {
+    const ARMS = 5;
+    const SEGMENTS_PER_ARM = 14; // dense enough that the sinusoidal outline reads as one smooth path
+    const outerR = headRadius * 1.15; // arm-tip radius
+    const innerR = headRadius * 0.5; // valley (armpit) radius — shallow, not a sharp notch
+    // Tumbles continuously from its own time-phase rather than tracking t.heading — the
+    // whole point of the creature is that it doesn't "point" anywhere.
+    const rotation = reducedMotion ? t.wigglePhase : time * 0.18 + t.wigglePhase;
+
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = t.color;
+    ctx.beginPath();
+    const totalSegments = ARMS * SEGMENTS_PER_ARM;
+    for (let i = 0; i <= totalSegments; i++) {
+      const theta = (i / totalSegments) * Math.PI * 2;
+      const lobe = 0.5 + 0.5 * Math.cos(ARMS * theta); // 1 at each tip, 0 at each valley
+      const shaped = Math.pow(lobe, 1.7); // sharpens the taper near the tip, flattens the valley
+      const r = innerR + (outerR - innerR) * shaped;
+      const angle = theta + rotation;
+      const x = t.x + Math.cos(angle) * r;
+      const y = t.y + Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Central disc reads as a slightly raised hub
+    ctx.beginPath();
+    ctx.arc(t.x, t.y, innerR * 0.62, 0, Math.PI * 2);
+    ctx.fillStyle = "#000";
+    ctx.globalAlpha = alpha * 0.16;
+    ctx.fill();
+
+    // Deterministic ring of texture dots running down each arm (never Math.random — would strobe)
+    const DOTS_PER_ARM = 3;
+    ctx.fillStyle = "#000";
+    ctx.globalAlpha = alpha * 0.22;
+    for (let a = 0; a < ARMS; a++) {
+      const armAngle = (a / ARMS) * Math.PI * 2 + rotation;
+      for (let d = 1; d <= DOTS_PER_ARM; d++) {
+        const dFrac = d / (DOTS_PER_ARM + 1);
+        const dr = innerR + (outerR - innerR) * dFrac * 0.85;
+        const dotR = headRadius * 0.09 * (1 - dFrac * 0.4);
+        ctx.beginPath();
+        ctx.arc(
+          t.x + Math.cos(armAngle) * dr,
+          t.y + Math.sin(armAngle) * dr,
+          dotR, 0, Math.PI * 2
+        );
+        ctx.fill();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+  },
+});
+
+// Whale shark: the "whoa" giant — biggest thing in the pond by far, spotted back, slow lunate tail sweep (~1 in 337)
+registerVariant("whaleshark", {
+  weight: 0.5,
+  sizeMul: 4.5,
+  speedMul: 0.35,
+  draw(ctx, t, time, alpha, headRadius, _speed, reducedMotion) {
+    // Derive a dark "back" tone and a pale "belly" tone from the player's color so
+    // identity still reads through hue, without needing a shared color-math helper.
+    const hex = t.color.replace("#", "");
+    const cr = parseInt(hex.substring(0, 2), 16) || 0;
+    const cg = parseInt(hex.substring(2, 4), 16) || 0;
+    const cb = parseInt(hex.substring(4, 6), 16) || 0;
+    const darkColor = `rgb(${Math.round(cr * 0.32)}, ${Math.round(cg * 0.32)}, ${Math.round(cb * 0.38)})`;
+    const paleColor = `rgb(${Math.round(cr + (255 - cr) * 0.85)}, ${Math.round(cg + (255 - cg) * 0.85)}, ${Math.round(cb + (255 - cb) * 0.85)})`;
+
+    const bodyLen = headRadius * 3.4;
+    const halfLen = bodyLen * 0.5;
+    const snoutX = halfLen;
+    const snoutHalfW = headRadius * 0.62;
+    const shoulderX = halfLen * 0.42;
+    const maxHalfW = headRadius * 1.05;
+    const midX = -halfLen * 0.15;
+    const midHalfW = maxHalfW * 0.82;
+    const peduncleX = -halfLen * 0.82;
+    const peduncleHalfW = headRadius * 0.2;
+    const tailBaseX = -halfLen;
+
+    ctx.save();
+    ctx.translate(t.x, t.y);
+    ctx.rotate(t.heading);
+    ctx.globalAlpha = alpha;
+
+    // Tall lunate tail, swept slowly and heavily — this creature never hurries
+    const sweep = reducedMotion ? 0 : Math.sin(time * 0.9 + t.wigglePhase) * 0.2;
+    ctx.save();
+    ctx.translate(tailBaseX, 0);
+    ctx.rotate(sweep);
+    const tailReach = headRadius * 1.55;
+    const tailSpan = headRadius * 1.7;
+    ctx.fillStyle = darkColor;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(0, side * peduncleHalfW * 0.7);
+      ctx.bezierCurveTo(
+        -tailReach * 0.35, side * tailSpan * 0.55,
+        -tailReach * 0.85, side * tailSpan,
+        -tailReach, side * tailSpan * 0.3
+      );
+      ctx.bezierCurveTo(
+        -tailReach * 0.78, side * tailSpan * 0.05,
+        -tailReach * 0.5, 0,
+        -tailReach * 0.28, 0
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Pectoral fins — swept back, jutting out past the body's silhouette
+    const pecX = shoulderX * 0.5;
+    const pecBaseW = maxHalfW * 0.75;
+    const pecTipX = pecX - headRadius * 1.3;
+    const pecTipW = pecBaseW + headRadius * 0.95;
+    ctx.fillStyle = darkColor;
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(pecX + headRadius * 0.35, side * pecBaseW * 0.85);
+      ctx.lineTo(pecTipX, side * pecTipW);
+      ctx.lineTo(pecX - headRadius * 0.25, side * pecBaseW * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // Dorsal fin — single triangle on the back edge, near the shoulder
+    const dorsalX = shoulderX * 0.15;
+    const dorsalBaseHalf = headRadius * 0.55;
+    const dorsalHeight = headRadius * 1.35;
+    const dorsalEdgeY = -maxHalfW * 0.92;
+    ctx.beginPath();
+    ctx.moveTo(dorsalX + dorsalBaseHalf * 0.6, dorsalEdgeY * 0.75);
+    ctx.lineTo(dorsalX - dorsalBaseHalf * 0.7, dorsalEdgeY * 0.85);
+    ctx.lineTo(dorsalX - dorsalBaseHalf * 0.15, dorsalEdgeY - dorsalHeight);
+    ctx.closePath();
+    ctx.fill();
+
+    // Body — broad flattened snout tapering to the tail peduncle, dark back fading
+    // to a pale belly. Gradient coords are local since we already translated/rotated.
+    ctx.beginPath();
+    ctx.moveTo(snoutX, -snoutHalfW);
+    ctx.bezierCurveTo(snoutX * 0.55, -maxHalfW * 0.98, shoulderX, -maxHalfW, midX, -midHalfW);
+    ctx.bezierCurveTo(midX - halfLen * 0.18, -midHalfW * 0.92, peduncleX + halfLen * 0.12, -peduncleHalfW * 2.2, peduncleX, -peduncleHalfW);
+    ctx.lineTo(tailBaseX, -peduncleHalfW * 0.55);
+    ctx.lineTo(tailBaseX, peduncleHalfW * 0.55);
+    ctx.lineTo(peduncleX, peduncleHalfW);
+    ctx.bezierCurveTo(peduncleX + halfLen * 0.12, peduncleHalfW * 2.2, midX - halfLen * 0.18, midHalfW * 0.92, midX, midHalfW);
+    ctx.bezierCurveTo(shoulderX, maxHalfW, snoutX * 0.55, maxHalfW * 0.98, snoutX, snoutHalfW);
+    ctx.closePath();
+    const grad = ctx.createLinearGradient(0, -maxHalfW, 0, maxHalfW);
+    grad.addColorStop(0, darkColor);
+    grad.addColorStop(0.62, darkColor);
+    grad.addColorStop(1, paleColor);
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Spotted back — grid of pale spots seeded from t.id so they stay fixed
+    // per-creature instead of re-randomizing (and strobing) every frame.
+    ctx.fillStyle = paleColor;
+    const SPOT_ROWS = 4;
+    const SPOTS_PER_ROW = 3;
+    for (let row = 0; row < SPOT_ROWS; row++) {
+      const rowFrac = row / (SPOT_ROWS - 1);
+      const rowX = shoulderX - rowFrac * (shoulderX - peduncleX * 0.7);
+      const rowHalfW = maxHalfW - rowFrac * (maxHalfW - peduncleHalfW * 2);
+      for (let col = 0; col < SPOTS_PER_ROW; col++) {
+        const seed = t.id * 131 + row * 977 + col * 7919;
+        const jitterX = (seededRandom(seed) - 0.5) * headRadius * 0.6;
+        const jitterY = (seededRandom(seed + 1) - 0.5) * rowHalfW * 0.4;
+        const colFrac = col / (SPOTS_PER_ROW - 1) - 0.5;
+        const spotY = -rowHalfW * (0.3 + Math.abs(colFrac) * 0.55) + jitterY;
+        const spotR = headRadius * (0.09 + seededRandom(seed + 2) * 0.06);
+        ctx.beginPath();
+        ctx.arc(rowX + jitterX, spotY, spotR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Small eyes near the snout tip — deliberately tiny, true to the real animal
+    ctx.fillStyle = "#1A1A1A";
+    ctx.globalAlpha = alpha * 0.85;
+    const eyeX = snoutX - headRadius * 0.35;
+    const eyeYOff = snoutHalfW * 0.55;
+    const eyeR = headRadius * 0.09;
+    ctx.beginPath();
+    ctx.arc(eyeX, -eyeYOff, eyeR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(eyeX, eyeYOff, eyeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+  },
+});
+
 function drawTadpoleTail(
   ctx: CanvasRenderingContext2D,
   t: Tadpole,
@@ -1071,7 +1613,6 @@ export default function FluidBackground({
           prevInterpY: rp.y * h,
           color: rp.color,
           tadpoles: [],
-          lastSpawnTime: 0,
         };
         players.set(rp.playerId, state);
       } else {
@@ -1134,9 +1675,37 @@ export default function FluidBackground({
       return isUIElement(e.target as Element);
     }
 
+    // A scrollable ancestor means the user is trying to scroll content (the chat
+    // log, say), not drag the pond — a tag-name allowlist alone misses those.
+    function hasScrollableAncestor(el: Element | null): boolean {
+      let node: Element | null = el;
+      while (node && node !== document.body) {
+        const overflowY = window.getComputedStyle(node).overflowY;
+        if (
+          (overflowY === "auto" || overflowY === "scroll") &&
+          node.scrollHeight > node.clientHeight
+        ) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+      return false;
+    }
+
+    // Decided once per gesture: touchmove fires far too often to afford a
+    // getComputedStyle walk on every event.
+    let suppressTouchScroll = false;
+
+    function handleTouchStart(e: TouchEvent) {
+      const target = e.target as Element;
+      suppressTouchScroll =
+        interactiveRef.current &&
+        !isUIElement(target) &&
+        !hasScrollableAncestor(target);
+    }
+
     function handleTouchMove(e: TouchEvent) {
-      if (!interactiveRef.current) return;
-      if (isUIElement(e.target as Element)) return;
+      if (!suppressTouchScroll) return;
       e.preventDefault();
     }
 
@@ -1164,11 +1733,13 @@ export default function FluidBackground({
 
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("pointermove", handlePointerMove);
+    document.addEventListener("touchstart", handleTouchStart, { passive: true });
     document.addEventListener("touchmove", handleTouchMove, { passive: false });
     document.addEventListener("dragstart", handleDragStart);
     return () => {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("pointermove", handlePointerMove);
+      document.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("touchmove", handleTouchMove);
       document.removeEventListener("dragstart", handleDragStart);
     };
@@ -1184,8 +1755,11 @@ export default function FluidBackground({
     const fxCtx = fxCanvas.getContext("2d");
     if (!lavaCtx || !fxCtx) return;
 
+    let lastDpr = window.devicePixelRatio || 1;
+
     function resize() {
       const dpr = window.devicePixelRatio || 1;
+      lastDpr = dpr;
       const w = window.innerWidth;
       const h = window.innerHeight;
       lavaCanvas!.width = Math.round(w * dpr * 0.5);
@@ -1199,9 +1773,26 @@ export default function FluidBackground({
     resize();
     window.addEventListener("resize", resize);
 
-    let slowFrameCount = 0;
+    let paused = false;
+
+    function handleVisibility() {
+      if (document.hidden && !paused) {
+        paused = true;
+        cancelAnimationFrame(animFrameRef.current);
+      } else if (!document.hidden && paused) {
+        paused = false;
+        lastFrameTime.current = 0; // fall back to a 16ms dt instead of the whole gap
+        animFrameRef.current = requestAnimationFrame(draw);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
 
     function draw(now: number) {
+      // Dragging the window to a display with a different pixel ratio changes
+      // devicePixelRatio without firing a resize event.
+      if ((window.devicePixelRatio || 1) !== lastDpr) resize();
+
       const dt = lastFrameTime.current
         ? Math.min((now - lastFrameTime.current) / 1000, 0.05)
         : 0.016;
@@ -1267,10 +1858,7 @@ export default function FluidBackground({
         state.interpX += (state.lastKnownX - state.interpX) * LERP_FACTOR;
         state.interpY += (state.lastKnownY - state.interpY) * LERP_FACTOR;
 
-        // Remove dead
-        state.tadpoles = state.tadpoles.filter((t) => t.alive);
-
-        // Update physics
+        // Update physics (the post-update filter below leaves this clean)
         for (const t of state.tadpoles) {
           if (!t.alive) continue;
           updateTadpole(t, state.interpX, state.interpY, state.tadpoles, dt, time, reduced);
@@ -1287,10 +1875,7 @@ export default function FluidBackground({
       const cursor = localCursorRef.current;
 
       if (cursor.x > -500) {
-        // Remove dead
-        localTadpolesRef.current = localTadpolesRef.current.filter((t) => t.alive);
-
-        // Update physics
+        // Update physics (the post-update filter below leaves this clean)
         for (const t of localTadpolesRef.current) {
           if (!t.alive) continue;
           updateTadpole(t, cursor.x, cursor.y, localTadpolesRef.current, dt, time, reduced);
@@ -1304,14 +1889,6 @@ export default function FluidBackground({
         }
       }
 
-      // --- FPS guard ---
-      const frameDuration = performance.now() - now;
-      if (frameDuration > 32) {
-        slowFrameCount++;
-      } else {
-        slowFrameCount = Math.max(0, slowFrameCount - 1);
-      }
-
       animFrameRef.current = requestAnimationFrame(draw);
     }
 
@@ -1320,6 +1897,22 @@ export default function FluidBackground({
     return () => {
       cancelAnimationFrame(animFrameRef.current);
       window.removeEventListener("resize", resize);
+      document.removeEventListener("visibilitychange", handleVisibility);
+
+      // Tadpoles come from a module-level pool guarded by a shared alive-count.
+      // Without releasing them here the count leaks on every navigation until it
+      // hits MAX_TADPOLES_TOTAL and spawning silently stops for the tab's life.
+      for (const t of localTadpolesRef.current) {
+        if (t.alive) killTadpole(t);
+      }
+      localTadpolesRef.current = [];
+      for (const [, state] of playersRef.current) {
+        for (const t of state.tadpoles) {
+          if (t.alive) killTadpole(t);
+        }
+        state.tadpoles = [];
+      }
+      playersRef.current.clear();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

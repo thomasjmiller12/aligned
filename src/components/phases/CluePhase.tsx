@@ -35,11 +35,14 @@ export default function CluePhase({
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [advancing, setAdvancing] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   if (!rounds || !myPlayer) return null;
 
   // Find my round (where I'm the clue giver)
   const myRound = rounds.find((r) => r.clueGiverId === myPlayer._id);
+  const hasSubmittedClue = submitted || !!myRound?.clue;
+  const showClueInput = !hasSubmittedClue || editing;
 
   async function handleSubmitClue() {
     if (!myRound || !clueText.trim() || submitting) return;
@@ -51,10 +54,16 @@ export default function CluePhase({
         clue: clueText.trim(),
       });
       setSubmitted(true);
+      setEditing(false);
       playClueSubmitted();
-    } catch {
+    } finally {
       setSubmitting(false);
     }
+  }
+
+  function handleEditClue() {
+    setClueText(myRound?.clue ?? clueText);
+    setEditing(true);
   }
 
   // Count how many players have submitted clues. Compare against the number of
@@ -91,7 +100,7 @@ export default function CluePhase({
             targetPosition={myRound.targetPosition}
           />
 
-          {!submitted && !myRound.clue ? (
+          {showClueInput ? (
             <div className="space-y-3">
               <input
                 type="text"
@@ -108,7 +117,11 @@ export default function CluePhase({
                 disabled={!clueText.trim() || submitting}
                 className="w-full rounded-xl bg-primary px-6 py-3 text-lg font-semibold text-white transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-40"
               >
-                {submitting ? "Submitting..." : "Submit Clue"}
+                {submitting
+                  ? "Submitting..."
+                  : editing
+                    ? "Update Clue"
+                    : "Submit Clue"}
               </button>
             </div>
           ) : (
@@ -121,6 +134,12 @@ export default function CluePhase({
               <p className="font-semibold">
                 Clue submitted: &quot;{myRound.clue || clueText}&quot;
               </p>
+              <button
+                onClick={handleEditClue}
+                className="mt-2 text-sm text-success underline underline-offset-2 hover:text-success/80"
+              >
+                Edit clue
+              </button>
             </motion.div>
           )}
         </div>

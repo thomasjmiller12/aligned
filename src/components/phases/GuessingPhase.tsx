@@ -81,6 +81,8 @@ export default function GuessingPhase({
   const [lockPending, setLockPending] = useState(false);
   const [unlockPending, setUnlockPending] = useState(false);
   const [revealPending, setRevealPending] = useState(false);
+  const [revealArmed, setRevealArmed] = useState(false);
+  const revealArmedTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   async function handleLockIn() {
     if (lockPending) return;
@@ -109,6 +111,13 @@ export default function GuessingPhase({
 
   async function handleReveal() {
     if (revealPending) return;
+    if (!allLockedIn && !revealArmed) {
+      setRevealArmed(true);
+      if (revealArmedTimeoutRef.current) clearTimeout(revealArmedTimeoutRef.current);
+      revealArmedTimeoutRef.current = setTimeout(() => setRevealArmed(false), 3000);
+      return;
+    }
+    if (revealArmedTimeoutRef.current) clearTimeout(revealArmedTimeoutRef.current);
     setRevealPending(true);
     try {
       await revealRound({ gameId: game._id, sessionId });
@@ -137,7 +146,7 @@ export default function GuessingPhase({
 
   const guessCount = (guesses ?? []).length;
   const lockedCount = (guesses ?? []).filter((g) => g.lockedIn).length;
-  const totalGuessers = players.length - 1; // exclude clue giver
+  const totalGuessers = players.filter((p) => !p.isSpectator).length - 1; // exclude clue giver and spectators
   // All locked when every guesser has a guess AND all are locked
   const allLockedIn =
     guessCount >= totalGuessers &&
@@ -168,6 +177,7 @@ export default function GuessingPhase({
         targetPosition={isClueGiver ? round.targetPosition : undefined}
         interactive={canGuess}
         myPosition={canGuess ? myPosition : undefined}
+        myColor={myPlayer?.color}
         onPositionChange={canGuess ? handlePositionChange : undefined}
         playerArrows={playerArrows}
         lockedIn={effectiveLocked}
@@ -226,7 +236,11 @@ export default function GuessingPhase({
           disabled={revealPending}
           className="text-sm text-text-secondary underline hover:text-text disabled:opacity-50"
         >
-          Reveal early (skip remaining)
+          {revealPending
+            ? "Revealing..."
+            : revealArmed
+              ? "Confirm — reveal early?"
+              : "Reveal early (skip remaining)"}
         </button>
       )}
     </div>

@@ -17,12 +17,12 @@ export default defineSchema({
     settings: v.object({
       clueTimerSeconds: v.number(),
       guessTimerSeconds: v.number(),
+      // Written by live game documents — do not remove without a data migration.
       personalizedCount: v.optional(v.number()),
     }),
     timerEndsAt: v.optional(v.number()),
   })
-    .index("by_code", ["code"])
-    .index("by_status", ["status"]),
+    .index("by_code", ["code"]),
 
   players: defineTable({
     gameId: v.id("games"),
@@ -34,7 +34,8 @@ export default defineSchema({
     isSpectator: v.optional(v.boolean()),
   })
     .index("by_game", ["gameId"])
-    .index("by_session", ["sessionId"]),
+    .index("by_session", ["sessionId"])
+    .index("by_game_session", ["gameId", "sessionId"]),
 
   rounds: defineTable({
     gameId: v.id("games"),

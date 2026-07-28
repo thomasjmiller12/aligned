@@ -184,11 +184,6 @@ export function playTimerWarning(urgent: boolean) {
   }
 }
 
-/** Generic button click */
-export function playButtonClick() {
-  playTone(600, 0.03, "triangle", 0.06);
-}
-
 /** Clue submitted successfully */
 export function playClueSubmitted() {
   playTone(880, 0.15, "sine", 0.08); // A5
