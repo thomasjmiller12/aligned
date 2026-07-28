@@ -1,12 +1,17 @@
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { scoreGuess } from "./scoring";
 
 export const autoLockClues = internalMutation({
-  args: { gameId: v.id("games") },
-  handler: async (ctx, { gameId }) => {
+  // `deadline` is the timerEndsAt this call was scheduled for. A room that
+  // plays again within the clue-timer window would otherwise have the previous
+  // game's timer fire mid-clue-phase and skip everyone who hadn't submitted.
+  args: { gameId: v.id("games"), deadline: v.optional(v.number()) },
+  handler: async (ctx, { gameId, deadline }) => {
     const game = await ctx.db.get(gameId);
     if (!game || game.status !== "clue_phase") return;
+    if (deadline !== undefined && game.timerEndsAt !== deadline) return;
 
     // Find rounds without clues and mark them
     const rounds = await ctx.db
@@ -73,10 +78,7 @@ export const autoLockGuesses = internalMutation({
     // Auto-reveal: calculate scores and advance to revealing
     let roundScore = 0;
     for (const guess of guesses) {
-      const diff = Math.abs(guess.position - round.targetPosition);
-      if (diff <= 5) roundScore += 4;
-      else if (diff <= 10) roundScore += 3;
-      else if (diff <= 15) roundScore += 2;
+      roundScore += scoreGuess(guess.position, round.targetPosition);
     }
 
     await ctx.db.patch(round._id, { status: "revealing" });

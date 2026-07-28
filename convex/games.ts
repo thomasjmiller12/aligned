@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { getRandomSpectrums } from "./spectrums";
+import { scoreGuess } from "./scoring";
 
 const PLAYER_COLORS = [
   "#E8553A",
@@ -21,18 +22,6 @@ const PLAYER_COLORS = [
   "#0891B2",
   "#E11D48",
 ];
-
-// Scoring thresholds — keep in sync with src/lib/scoring.ts SCORE_ZONES
-const BULLSEYE = 4, CLOSE = 12, NEAR = 20;
-
-/** Points a single guess earns, given its distance from the target in degrees. */
-function scoreGuess(guessPosition: number, targetPosition: number): number {
-  const diff = Math.abs(guessPosition - targetPosition);
-  if (diff <= BULLSEYE) return 4;
-  if (diff <= CLOSE) return 3;
-  if (diff <= NEAR) return 2;
-  return 0;
-}
 
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -178,7 +167,7 @@ export const startGame = mutation({
     await ctx.scheduler.runAfter(
       game.settings.clueTimerSeconds * 1000,
       internal.timers.autoLockClues,
-      { gameId }
+      { gameId, deadline: timerEndsAt }
     );
   },
 });
@@ -465,12 +454,15 @@ export const nextRound = mutation({
       .filter((r) => r.roundIndex > game.currentRound && r.clue)
       .sort((a, b) => a.roundIndex - b.roundIndex)[0];
 
-    // Mark all skipped rounds as scored
+    // Mark genuinely skipped rounds (no clue) as scored. Rounds that DO have a
+    // clue and are still ahead of us must be left alone: marking them scored
+    // here made getRounds treat them as revealed and hand their targetPosition
+    // to every client before the round was even played.
     for (const r of rounds) {
       if (
         r.roundIndex > game.currentRound &&
         r.status !== "scored" &&
-        r._id !== nextCluedRound?._id
+        !r.clue
       ) {
         await ctx.db.patch(r._id, { status: "scored" });
       }

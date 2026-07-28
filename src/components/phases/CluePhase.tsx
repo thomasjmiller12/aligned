@@ -57,11 +57,19 @@ export default function CluePhase({
     }
   }
 
-  // Count how many players have submitted clues
+  // Count how many players have submitted clues. Compare against the number of
+  // rounds, not players: anyone who joined after the game started is a
+  // spectator with no round of their own, and comparing to players.length meant
+  // allSubmitted could never go true, so the room was stuck waiting out the
+  // full clue timer.
   const submittedCount = rounds.filter(
     (r) => r.clue || r.status === "clue_given"
   ).length;
-  const allSubmitted = submittedCount === players.length;
+  const allSubmitted = rounds.length > 0 && submittedCount === rounds.length;
+  const waitingOn = players.filter((p) => {
+    const pRound = rounds.find((r) => r.clueGiverId === p._id);
+    return pRound && !pRound.clue && pRound.status !== "clue_given";
+  });
 
   return (
     <div className="space-y-2 text-center">
@@ -121,7 +129,7 @@ export default function CluePhase({
       {/* Status of other players */}
       <div className="glass-card rounded-xl p-4 shadow-sm">
         <div className="mb-2 text-sm font-medium text-text-secondary">
-          {submittedCount} / {players.length} clues submitted
+          {submittedCount} / {rounds.length} clues submitted
         </div>
         <div className="flex justify-center gap-2">
           {players.map((p) => {
