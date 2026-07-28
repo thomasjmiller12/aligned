@@ -31,7 +31,11 @@ export default function GameOverPhase({
     gameId: game._id,
     sessionId,
   });
+  const clueScores = useQuery(api.games.getClueScores, { gameId: game._id });
   const playAgain = useMutation(api.games.playAgain);
+
+  const clueRanking = clueScores?.byPlayer ?? [];
+  const roundPoints = clueScores?.byRound;
 
   // Play game over fanfare once
   const soundPlayedRef = useRef(false);
@@ -91,9 +95,12 @@ export default function GameOverPhase({
           transition={{ delay: 0.7 }}
           className="glass-card rounded-2xl p-5 shadow-sm"
         >
-          <h3 className="mb-3 text-sm font-medium uppercase tracking-wider text-text-secondary">
-            Player Scores
+          <h3 className="mb-1 text-sm font-medium uppercase tracking-wider text-text-secondary">
+            Guessing Scores
           </h3>
+          <p className="mb-3 text-xs text-text-secondary">
+            Points you earned from your own guesses
+          </p>
           <div className="space-y-2">
             {[...activePlayers]
               .sort((a, b) => (playerScores[b._id] ?? 0) - (playerScores[a._id] ?? 0))
@@ -122,6 +129,83 @@ export default function GameOverPhase({
                   </div>
                 );
               })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Best Clues — how many points each player's clue earned the team */}
+      {clueRanking.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.75 }}
+          className="glass-card rounded-2xl p-5 shadow-sm"
+        >
+          <h3 className="mb-1 text-sm font-medium uppercase tracking-wider text-text-secondary">
+            Best Clues
+          </h3>
+          <p className="mb-3 text-xs text-text-secondary">
+            Points your clue earned the team
+          </p>
+          <div className="space-y-2">
+            {clueRanking.map((c, i) => {
+              const giver = players.find((p) => p._id === c.clueGiverId);
+              const pct =
+                c.maxPoints > 0 ? Math.round((c.points / c.maxPoints) * 100) : 0;
+              return (
+                <div
+                  key={c.clueGiverId}
+                  className="rounded-lg bg-cream px-3 py-2 text-left text-sm"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-4 font-mono text-xs text-text-secondary">
+                      {i === 0 && c.points > 0 ? "🏆" : i + 1}
+                    </span>
+                    <div
+                      className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                      style={{ backgroundColor: giver?.color }}
+                    >
+                      {giver?.name.charAt(0).toUpperCase() ?? "?"}
+                    </div>
+                    <span className="flex-1 truncate font-medium">
+                      {giver?.name ?? "Unknown"}
+                    </span>
+                    <span
+                      className="font-bold tabular-nums"
+                      style={{ color: giver?.color }}
+                    >
+                      {c.points}
+                      <span className="text-xs font-medium text-text-secondary">
+                        /{c.maxPoints}
+                      </span>
+                    </span>
+                  </div>
+                  {/* Accuracy bar + the clue itself */}
+                  <div className="mt-1.5 flex items-center gap-2 pl-[3.25rem]">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/5">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
+                        transition={{ delay: 0.9 + i * 0.08, duration: 0.5 }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: giver?.color }}
+                      />
+                    </div>
+                    <span className="w-9 text-right text-xs tabular-nums text-text-secondary">
+                      {pct}%
+                    </span>
+                  </div>
+                  <p className="mt-1 truncate pl-[3.25rem] text-xs italic text-text-secondary">
+                    “{c.clues.join("”, “")}”
+                    {c.bullseyes > 0 && (
+                      <span className="ml-1 not-italic">
+                        · {c.bullseyes} bullseye{c.bullseyes !== 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
           </div>
         </motion.div>
       )}
@@ -161,6 +245,11 @@ export default function GameOverPhase({
                         {r.spectrumLeft} ↔ {r.spectrumRight}
                       </span>
                     </div>
+                    {roundPoints?.[r._id] && (
+                      <span className="flex-shrink-0 rounded-full bg-white/70 px-2 py-0.5 text-xs font-semibold tabular-nums">
+                        +{roundPoints[r._id].points}
+                      </span>
+                    )}
                   </div>
                 );
               })}

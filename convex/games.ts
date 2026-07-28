@@ -22,6 +22,18 @@ const PLAYER_COLORS = [
   "#E11D48",
 ];
 
+// Scoring thresholds — keep in sync with src/lib/scoring.ts SCORE_ZONES
+const BULLSEYE = 4, CLOSE = 12, NEAR = 20;
+
+/** Points a single guess earns, given its distance from the target in degrees. */
+function scoreGuess(guessPosition: number, targetPosition: number): number {
+  const diff = Math.abs(guessPosition - targetPosition);
+  if (diff <= BULLSEYE) return 4;
+  if (diff <= CLOSE) return 3;
+  if (diff <= NEAR) return 2;
+  return 0;
+}
+
 function generateCode(): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ";
   let code = "";
@@ -410,14 +422,9 @@ export const revealRound = mutation({
       }
     }
 
-    // Scoring thresholds — keep in sync with src/lib/scoring.ts SCORE_ZONES
-    const BULLSEYE = 4, CLOSE = 12, NEAR = 20;
     let roundScore = 0;
     for (const guess of guesses) {
-      const diff = Math.abs(guess.position - round.targetPosition);
-      if (diff <= BULLSEYE) roundScore += 4;
-      else if (diff <= CLOSE) roundScore += 3;
-      else if (diff <= NEAR) roundScore += 2;
+      roundScore += scoreGuess(guess.position, round.targetPosition);
     }
 
     await ctx.db.patch(round._id, { status: "revealing" });
@@ -766,8 +773,6 @@ export const getPlayerScores = query({
       .withIndex("by_game", (q) => q.eq("gameId", gameId))
       .collect();
 
-    // Scoring thresholds — keep in sync with src/lib/scoring.ts SCORE_ZONES
-    const BULLSEYE = 4, CLOSE = 12, NEAR = 20;
     const scores: Record<string, number> = {};
 
     for (const round of rounds) {
@@ -778,16 +783,84 @@ export const getPlayerScores = query({
         .collect();
 
       for (const guess of guesses) {
-        const diff = Math.abs(guess.position - round.targetPosition);
-        let pts = 0;
-        if (diff <= BULLSEYE) pts = 4;
-        else if (diff <= CLOSE) pts = 3;
-        else if (diff <= NEAR) pts = 2;
         const pid = guess.playerId as string;
-        scores[pid] = (scores[pid] ?? 0) + pts;
+        scores[pid] =
+          (scores[pid] ?? 0) + scoreGuess(guess.position, round.targetPosition);
       }
     }
     return scores;
+  },
+});
+
+/**
+ * How well each player's clue landed: the points their round's guessers earned,
+ * out of what was available. Used for the "Best Clues" board at game over.
+ * Ranked by accuracy rather than raw points so a round with fewer guessers
+ * (late joiner, someone who never locked in) isn't unfairly penalised.
+ */
+export const getClueScores = query({
+  args: { gameId: v.id("games") },
+  handler: async (ctx, { gameId }) => {
+    const rounds = await ctx.db
+      .query("rounds")
+      .withIndex("by_game", (q) => q.eq("gameId", gameId))
+      .collect();
+
+    const byGiver: Record<
+      string,
+      {
+        clueGiverId: string;
+        clues: string[];
+        points: number;
+        maxPoints: number;
+        bullseyes: number;
+      }
+    > = {};
+    // Per-round totals, for the chronological recap list.
+    const byRound: Record<string, { points: number; maxPoints: number }> = {};
+
+    for (const round of rounds) {
+      if (round.status !== "revealing" && round.status !== "scored") continue;
+      if (!round.clue) continue; // skipped rounds don't count for or against
+
+      const guesses = await ctx.db
+        .query("guesses")
+        .withIndex("by_round", (q) => q.eq("roundId", round._id))
+        .collect();
+
+      const giverId = round.clueGiverId as string;
+      const entry = (byGiver[giverId] ??= {
+        clueGiverId: giverId,
+        clues: [],
+        points: 0,
+        maxPoints: 0,
+        bullseyes: 0,
+      });
+
+      entry.clues.push(round.clue);
+      entry.maxPoints += guesses.length * 4;
+
+      let roundPoints = 0;
+      for (const guess of guesses) {
+        const pts = scoreGuess(guess.position, round.targetPosition);
+        roundPoints += pts;
+        if (pts === 4) entry.bullseyes++;
+      }
+      entry.points += roundPoints;
+      byRound[round._id] = {
+        points: roundPoints,
+        maxPoints: guesses.length * 4,
+      };
+    }
+
+    const byPlayer = Object.values(byGiver).sort((a, b) => {
+      const aPct = a.maxPoints > 0 ? a.points / a.maxPoints : 0;
+      const bPct = b.maxPoints > 0 ? b.points / b.maxPoints : 0;
+      if (bPct !== aPct) return bPct - aPct;
+      return b.points - a.points;
+    });
+
+    return { byPlayer, byRound };
   },
 });
 
